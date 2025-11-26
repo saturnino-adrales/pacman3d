@@ -87,7 +87,7 @@
         <div id="lives">Lives: ❤️❤️❤️</div>
     </div>
     <div id="instructions">
-        WASD or Arrow Keys to move | Collect all dots to win!
+        WASD or Arrow Keys to move | SPACE to jump over ghosts | Collect all dots to win!
     </div>
     <div id="gameOver">
         GAME OVER
@@ -236,6 +236,30 @@
 
             osc.start(now);
             osc.stop(now + 0.08);
+        }
+
+        // Jump sound effect
+        function playJumpSound() {
+            if (!audioCtx) return;
+            const ctx = audioCtx;
+            const now = ctx.currentTime;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'square';
+            // Rising pitch for jump
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.15);
         }
 
         // Game state
@@ -568,6 +592,14 @@
         let mouthOpen = 0;
         let mouthDir = 1;
 
+        // Jump state
+        let isJumping = false;
+        let jumpVelocity = 0;
+        let pacmanY = 0.8; // Base Y position
+        const JUMP_FORCE = 0.35;
+        const GRAVITY = 0.015;
+        const GROUND_Y = 0.8;
+
         // Create floor
         function createFloor() {
             const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE + 4, MAZE_HEIGHT * CELL_SIZE + 4);
@@ -860,8 +892,22 @@
             if (pacmanPos.x < -0.5) pacmanPos.x = MAZE_WIDTH - 0.5;
             if (pacmanPos.x > MAZE_WIDTH - 0.5) pacmanPos.x = -0.5;
 
+            // Jump physics
+            if (isJumping) {
+                pacmanY += jumpVelocity;
+                jumpVelocity -= GRAVITY;
+
+                // Land on ground
+                if (pacmanY <= GROUND_Y) {
+                    pacmanY = GROUND_Y;
+                    isJumping = false;
+                    jumpVelocity = 0;
+                }
+            }
+
             // Update mesh position
             pacman.position.x = pacmanPos.x * CELL_SIZE + CELL_SIZE / 2;
+            pacman.position.y = pacmanY;
             pacman.position.z = pacmanPos.z * CELL_SIZE + CELL_SIZE / 2;
 
             // Rotate Pacman based on direction
@@ -1056,6 +1102,11 @@
 
         // Check ghost collision
         function checkGhostCollision(ghost) {
+            // Skip collision if Pac-Man is jumping high enough
+            if (isJumping && pacmanY > GROUND_Y + 1.0) {
+                return; // Pac-Man is in the air, safe from ghosts
+            }
+
             const dist = Math.sqrt(
                 Math.pow(ghost.userData.gridX - pacmanPos.x, 2) +
                 Math.pow(ghost.userData.gridZ - pacmanPos.z, 2)
@@ -1163,6 +1214,13 @@
                 nextDir = dirs.left;
             } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
                 nextDir = dirs.right;
+            }
+
+            // Jump with spacebar
+            if (e.code === 'Space' && !isJumping && gameRunning) {
+                isJumping = true;
+                jumpVelocity = JUMP_FORCE;
+                playJumpSound();
             }
         });
 

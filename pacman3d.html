@@ -856,30 +856,9 @@
                 pacmanPos.z = newZ;
             }
 
-            // Wrap around (teleport tunnels)
-            let justTeleported = false;
-            if (pacmanPos.x < -0.5) {
-                pacmanPos.x = MAZE_WIDTH - 0.5;
-                justTeleported = true;
-            }
-            if (pacmanPos.x > MAZE_WIDTH - 0.5) {
-                pacmanPos.x = -0.5;
-                justTeleported = true;
-            }
-
-            // If teleported, snap camera instantly
-            if (justTeleported) {
-                const dirAngle = Math.atan2(pacmanDir.x, pacmanDir.z);
-                const newCamX = (pacmanPos.x * CELL_SIZE + CELL_SIZE / 2) - Math.sin(dirAngle) * cameraOffset.z;
-                const newCamZ = (pacmanPos.z * CELL_SIZE + CELL_SIZE / 2) - Math.cos(dirAngle) * cameraOffset.z;
-                cameraTargetPos.set(newCamX, cameraOffset.y, newCamZ);
-                camera.position.copy(cameraTargetPos);
-
-                // Also snap look target
-                const lookX = pacmanPos.x * CELL_SIZE + CELL_SIZE / 2 + Math.sin(dirAngle) * cameraLookAhead;
-                const lookZ = pacmanPos.z * CELL_SIZE + CELL_SIZE / 2 + Math.cos(dirAngle) * cameraLookAhead;
-                cameraTargetLook.set(lookX, 1, lookZ);
-            }
+            // Wrap around
+            if (pacmanPos.x < -0.5) pacmanPos.x = MAZE_WIDTH - 0.5;
+            if (pacmanPos.x > MAZE_WIDTH - 0.5) pacmanPos.x = -0.5;
 
             // Update mesh position
             pacman.position.x = pacmanPos.x * CELL_SIZE + CELL_SIZE / 2;

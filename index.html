@@ -1300,7 +1300,7 @@
             // Update instructions to show gamepad connected
             const instructions = document.getElementById('instructions');
             if (instructions) {
-                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad: move | A: jump | LB/RB: camera | LT: fullscreen';
+                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad: move | A: jump | LB: camera | RB: fullscreen';
             }
         });
 
@@ -1391,31 +1391,20 @@
             }
             prevGamepadButtons.a = aButton;
 
-            // LB (index 4) - previous camera mode
+            // LB (index 4) - cycle camera mode
             const lbButton = gamepad.buttons[4]?.pressed;
             if (lbButton && !prevGamepadButtons.lb) {
-                const newMode = cameraMode === 1 ? 3 : cameraMode - 1;
+                const newMode = cameraMode === 3 ? 1 : cameraMode + 1;
                 setCameraMode(newMode);
             }
             prevGamepadButtons.lb = lbButton;
 
-            // RB (index 5) - next camera mode
+            // RB (index 5) - toggle fullscreen
             const rbButton = gamepad.buttons[5]?.pressed;
             if (rbButton && !prevGamepadButtons.rb) {
-                const newMode = cameraMode === 3 ? 1 : cameraMode + 1;
-                setCameraMode(newMode);
-            }
-            prevGamepadButtons.rb = rbButton;
-
-            // LT/L2 - toggle fullscreen
-            // Triggers can be buttons (index 6) OR axes (index 2) depending on browser/controller
-            const ltButton = gamepad.buttons[6]?.pressed || gamepad.buttons[6]?.value > 0.5;
-            const ltAxis = gamepad.axes[2] !== undefined ? gamepad.axes[2] > 0.5 : false;
-            const ltPressed = ltButton || ltAxis;
-            if (ltPressed && !prevGamepadButtons.lt) {
                 toggleFullscreen();
             }
-            prevGamepadButtons.lt = ltPressed;
+            prevGamepadButtons.rb = rbButton;
         }
 
         // Fullscreen toggle function

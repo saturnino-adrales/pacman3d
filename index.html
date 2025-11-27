@@ -1300,7 +1300,7 @@
             // Update instructions to show gamepad connected
             const instructions = document.getElementById('instructions');
             if (instructions) {
-                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad to move | A to jump | LB/RB to change camera';
+                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad: move | A: jump | LB/RB: camera | L2: fullscreen';
             }
         });
 
@@ -1406,6 +1406,33 @@
                 setCameraMode(newMode);
             }
             prevGamepadButtons.rb = rbButton;
+
+            // L2 (index 6) - toggle fullscreen
+            const l2Button = gamepad.buttons[6]?.pressed;
+            if (l2Button && !prevGamepadButtons.l2) {
+                toggleFullscreen();
+            }
+            prevGamepadButtons.l2 = l2Button;
+        }
+
+        // Fullscreen toggle function
+        function toggleFullscreen() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                // Enter fullscreen
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen(); // Safari/iOS
+                }
+            } else {
+                // Exit fullscreen
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen(); // Safari/iOS
+                }
+            }
         }
 
         // Initialize game

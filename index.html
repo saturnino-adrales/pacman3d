@@ -88,7 +88,7 @@
         <div id="modeDisplay" style="margin-top: 10px; color: #aaa; font-size: 16px;">Mode: Classic (Press 1/2/3)</div>
     </div>
     <div id="instructions">
-        WASD or Arrow Keys to move | SPACE to jump | 1/2/3 to change camera mode | Collect all dots to win!
+        WASD: move | Q/E: look left/right | R/F: look up/down | SPACE: jump | 1/2/3: camera mode
     </div>
     <div id="gameOver">
         GAME OVER
@@ -663,6 +663,83 @@
             floor.position.set(MAZE_WIDTH * CELL_SIZE / 2, -0.5, MAZE_HEIGHT * CELL_SIZE / 2);
             floor.receiveShadow = true;
             scene.add(floor);
+        }
+
+        // Create starfield sky dome
+        function createStarfield() {
+            // Create a large dome above the scene with stars
+            const skyGeometry = new THREE.SphereGeometry(200, 32, 32);
+
+            // Create starfield texture
+            const starCanvas = document.createElement('canvas');
+            starCanvas.width = 2048;
+            starCanvas.height = 1024;
+            const ctx = starCanvas.getContext('2d');
+
+            // Dark night sky gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, starCanvas.height);
+            gradient.addColorStop(0, '#000511');    // Deep space blue at top
+            gradient.addColorStop(0.3, '#0a0a1a');  // Dark blue
+            gradient.addColorStop(0.7, '#0f0f2a');  // Slightly lighter
+            gradient.addColorStop(1, '#1a1a3a');    // Horizon tint
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, starCanvas.width, starCanvas.height);
+
+            // Add stars - more dense at top (center of dome when looking up)
+            for (let i = 0; i < 3000; i++) {
+                const x = Math.random() * starCanvas.width;
+                // Bias towards top half where you look up
+                const y = Math.random() * Math.random() * starCanvas.height * 0.8;
+                const size = Math.random() * 2 + 0.5;
+                const brightness = Math.floor(Math.random() * 155) + 100;
+
+                // Some stars are slightly colored
+                const r = brightness + Math.floor(Math.random() * 30);
+                const g = brightness + Math.floor(Math.random() * 20);
+                const b = brightness + Math.floor(Math.random() * 50);
+
+                ctx.fillStyle = `rgb(${Math.min(255, r)}, ${Math.min(255, g)}, ${Math.min(255, b)})`;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Add glow to brighter stars
+                if (brightness > 200 && Math.random() > 0.7) {
+                    ctx.fillStyle = `rgba(255, 255, 255, 0.1)`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size * 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Add a few larger bright stars
+            for (let i = 0; i < 50; i++) {
+                const x = Math.random() * starCanvas.width;
+                const y = Math.random() * starCanvas.height * 0.5;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fill();
+                // Cross sparkle
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(x - 6, y);
+                ctx.lineTo(x + 6, y);
+                ctx.moveTo(x, y - 6);
+                ctx.lineTo(x, y + 6);
+                ctx.stroke();
+            }
+
+            const starTexture = new THREE.CanvasTexture(starCanvas);
+            const skyMaterial = new THREE.MeshBasicMaterial({
+                map: starTexture,
+                side: THREE.BackSide  // Render inside of sphere
+            });
+
+            const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+            sky.position.set(MAZE_WIDTH * CELL_SIZE / 2, 0, MAZE_HEIGHT * CELL_SIZE / 2);
+            scene.add(sky);
         }
 
         // Create walls
@@ -1368,6 +1445,31 @@
             if (e.key === '1') setCameraMode(1);
             if (e.key === '2') setCameraMode(2);
             if (e.key === '3') setCameraMode(3);
+
+            // Keyboard camera controls (Q/E for horizontal, R/F for vertical)
+            if (cameraMode === 2) {
+                // Third-person mode - orbit camera
+                if (e.key.toLowerCase() === 'q') {
+                    cameraOrbitAngle -= CAMERA_ROTATE_SPEED * 3;
+                } else if (e.key.toLowerCase() === 'e') {
+                    cameraOrbitAngle += CAMERA_ROTATE_SPEED * 3;
+                } else if (e.key.toLowerCase() === 'r') {
+                    cameraPitchAngle = Math.min(CAMERA_PITCH_MAX, cameraPitchAngle + CAMERA_PITCH_SPEED * 3);
+                } else if (e.key.toLowerCase() === 'f') {
+                    cameraPitchAngle = Math.max(CAMERA_PITCH_MIN, cameraPitchAngle - CAMERA_PITCH_SPEED * 3);
+                }
+            } else if (cameraMode === 3) {
+                // FPS mode - free look
+                if (e.key.toLowerCase() === 'q') {
+                    fpsYawAngle -= FPS_LOOK_SPEED * 3;
+                } else if (e.key.toLowerCase() === 'e') {
+                    fpsYawAngle += FPS_LOOK_SPEED * 3;
+                } else if (e.key.toLowerCase() === 'r') {
+                    fpsPitchAngle = Math.min(FPS_PITCH_MAX, fpsPitchAngle + FPS_LOOK_SPEED * 3);
+                } else if (e.key.toLowerCase() === 'f') {
+                    fpsPitchAngle = Math.max(FPS_PITCH_MIN, fpsPitchAngle - FPS_LOOK_SPEED * 3);
+                }
+            }
         });
 
         document.addEventListener('keyup', (e) => {
@@ -1398,7 +1500,7 @@
             // Restore keyboard instructions
             const instructions = document.getElementById('instructions');
             if (instructions) {
-                instructions.innerHTML = 'WASD or Arrow Keys to move | SPACE to jump | 1/2/3 to change camera mode | Collect all dots to win!';
+                instructions.innerHTML = 'WASD: move | Q/E: look left/right | R/F: look up/down | SPACE: jump | 1/2/3: camera mode';
             }
         });
 
@@ -1528,6 +1630,7 @@
         // Initialize game
         function init() {
             createFloor();
+            createStarfield();
             createWalls();
             createDots();
             createPacman();

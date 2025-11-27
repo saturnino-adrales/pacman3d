@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Pac-Man</title>
+    <title>Pac-Man 3D</title>
     <style>
         * {
             margin: 0;
@@ -85,9 +85,10 @@
     <div id="ui">
         <div id="score">Score: 0</div>
         <div id="lives">Lives: ❤️❤️❤️</div>
+        <div id="modeDisplay" style="margin-top: 10px; color: #aaa; font-size: 16px;">Mode: Classic (Press 1/2/3)</div>
     </div>
     <div id="instructions">
-        WASD or Arrow Keys to move | SPACE to jump over ghosts | Collect all dots to win!
+        WASD or Arrow Keys to move | SPACE to jump | 1/2/3 to change camera mode | Collect all dots to win!
     </div>
     <div id="gameOver">
         GAME OVER
@@ -272,6 +273,14 @@
         let totalDots = 0;
         let collectedDots = 0;
 
+        // Camera modes: 1 = Classic (top-down), 2 = Third-person, 3 = FPS
+        let cameraMode = 1;
+        const cameraModes = {
+            1: { name: 'Classic', offsetY: 40, offsetZ: 10, lookY: 0, fov: 60 },
+            2: { name: '3rd Person', offsetY: 8, offsetZ: 12, lookAhead: 5, fov: 70 },
+            3: { name: 'FPS', eyeHeight: 1.2, lookDistance: 10, fov: 90 }
+        };
+
         // Maze layout (1 = wall, 0 = path, 2 = dot, 3 = power pellet, 4 = ghost spawn)
         const maze = [
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -303,19 +312,50 @@
         // Three.js setup
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a2e);
-        scene.fog = new THREE.Fog(0x1a1a2e, 15, 60);
+        scene.fog = new THREE.Fog(0x1a1a2e, 20, 80);
 
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
-        // Camera will follow Pac-Man - initial position updated in animate loop
-        const cameraOffset = { x: 0, y: 8, z: 12 }; // Behind and above Pac-Man
-        const cameraLookAhead = 5; // How far ahead of Pac-Man to look
-        // Initialize camera at Pac-Man's starting position (grid 9, 15)
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Initialize camera for Classic mode (top-down view)
         const startX = 9 * CELL_SIZE + CELL_SIZE / 2;
         const startZ = 15 * CELL_SIZE + CELL_SIZE / 2;
-        let cameraTargetPos = new THREE.Vector3(startX, cameraOffset.y, startZ + cameraOffset.z);
-        let cameraTargetLook = new THREE.Vector3(startX, 1, startZ - cameraLookAhead);
+        let cameraTargetPos = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 40, MAZE_HEIGHT * CELL_SIZE + 10);
+        let cameraTargetLook = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 0, MAZE_HEIGHT * CELL_SIZE / 2);
         camera.position.copy(cameraTargetPos);
         camera.lookAt(cameraTargetLook);
+
+        // Function to switch camera mode
+        function setCameraMode(mode) {
+            cameraMode = mode;
+            camera.fov = cameraModes[mode].fov;
+            camera.updateProjectionMatrix();
+
+            // Update fog based on mode
+            if (mode === 1) {
+                scene.fog.near = 20;
+                scene.fog.far = 80;
+            } else if (mode === 2) {
+                scene.fog.near = 15;
+                scene.fog.far = 60;
+            } else {
+                scene.fog.near = 5;
+                scene.fog.far = 40;
+            }
+
+            // Show/hide Pac-Man based on mode
+            if (pacman) {
+                pacman.visible = (mode !== 3);
+            }
+
+            updateModeDisplay();
+        }
+
+        // Update mode display in UI
+        function updateModeDisplay() {
+            const modeDisplay = document.getElementById('modeDisplay');
+            if (modeDisplay) {
+                modeDisplay.textContent = `Mode: ${cameraModes[cameraMode].name} (Press 1/2/3)`;
+            }
+        }
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1204,16 +1244,31 @@
         document.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
 
-            const dirs = getRelativeDirections();
+            // Classic mode uses absolute directions, other modes use relative
+            if (cameraMode === 1) {
+                // Classic mode - absolute directions (original Pac-Man style)
+                if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+                    nextDir = { x: 0, z: -1 }; // Up
+                } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
+                    nextDir = { x: 0, z: 1 }; // Down
+                } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+                    nextDir = { x: -1, z: 0 }; // Left
+                } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+                    nextDir = { x: 1, z: 0 }; // Right
+                }
+            } else {
+                // Third-person and FPS modes - relative to Pac-Man's facing direction
+                const dirs = getRelativeDirections();
 
-            if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
-                nextDir = dirs.forward;
-            } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
-                nextDir = dirs.backward;
-            } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
-                nextDir = dirs.left;
-            } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
-                nextDir = dirs.right;
+                if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+                    nextDir = dirs.forward;
+                } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
+                    nextDir = dirs.backward;
+                } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+                    nextDir = dirs.left;
+                } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+                    nextDir = dirs.right;
+                }
             }
 
             // Jump with spacebar
@@ -1222,6 +1277,11 @@
                 jumpVelocity = JUMP_FORCE;
                 playJumpSound();
             }
+
+            // Camera mode switching with 1, 2, 3 keys
+            if (e.key === '1') setCameraMode(1);
+            if (e.key === '2') setCameraMode(2);
+            if (e.key === '3') setCameraMode(3);
         });
 
         document.addEventListener('keyup', (e) => {
@@ -1269,27 +1329,57 @@
             updatePacman();
             updateGhosts();
 
-            // Camera follows Pac-Man
+            // Camera positioning based on current mode
             if (pacman) {
-                // Calculate camera position behind Pac-Man based on his direction
                 const dirAngle = Math.atan2(pacmanDir.x, pacmanDir.z);
+                const config = cameraModes[cameraMode];
 
-                // Position camera behind Pac-Man
-                const targetX = pacman.position.x - Math.sin(dirAngle) * cameraOffset.z;
-                const targetY = cameraOffset.y;
-                const targetZ = pacman.position.z - Math.cos(dirAngle) * cameraOffset.z;
+                if (cameraMode === 1) {
+                    // Classic mode - top-down view of entire maze
+                    const targetX = MAZE_WIDTH * CELL_SIZE / 2;
+                    const targetY = config.offsetY;
+                    const targetZ = MAZE_HEIGHT * CELL_SIZE / 2 + config.offsetZ;
 
-                // Smooth camera movement (very slow lerp for smooth feel)
-                cameraTargetPos.set(targetX, targetY, targetZ);
-                camera.position.lerp(cameraTargetPos, 0.015);
+                    cameraTargetPos.set(targetX, targetY, targetZ);
+                    camera.position.lerp(cameraTargetPos, 0.05);
 
-                // Look ahead of Pac-Man
-                const lookX = pacman.position.x + Math.sin(dirAngle) * cameraLookAhead;
-                const lookZ = pacman.position.z + Math.cos(dirAngle) * cameraLookAhead;
+                    cameraTargetLook.set(MAZE_WIDTH * CELL_SIZE / 2, config.lookY, MAZE_HEIGHT * CELL_SIZE / 2);
+                    camera.lookAt(cameraTargetLook);
 
-                // Smooth look target (lerp instead of snap)
-                cameraTargetLook.lerp(new THREE.Vector3(lookX, 1, lookZ), 0.02);
-                camera.lookAt(cameraTargetLook);
+                } else if (cameraMode === 2) {
+                    // Third-person mode - follow behind Pac-Man
+                    const targetX = pacman.position.x - Math.sin(dirAngle) * config.offsetZ;
+                    const targetY = config.offsetY + (pacmanY - GROUND_Y);
+                    const targetZ = pacman.position.z - Math.cos(dirAngle) * config.offsetZ;
+
+                    cameraTargetPos.set(targetX, targetY, targetZ);
+                    camera.position.lerp(cameraTargetPos, 0.015);
+
+                    // Look ahead of Pac-Man
+                    const lookX = pacman.position.x + Math.sin(dirAngle) * config.lookAhead;
+                    const lookY = 1.5;
+                    const lookZ = pacman.position.z + Math.cos(dirAngle) * config.lookAhead;
+
+                    cameraTargetLook.lerp(new THREE.Vector3(lookX, lookY, lookZ), 0.02);
+                    camera.lookAt(cameraTargetLook);
+
+                } else if (cameraMode === 3) {
+                    // FPS mode - at Pac-Man's eye level
+                    const targetX = pacman.position.x;
+                    const targetY = config.eyeHeight + (pacmanY - GROUND_Y);
+                    const targetZ = pacman.position.z;
+
+                    cameraTargetPos.set(targetX, targetY, targetZ);
+                    camera.position.lerp(cameraTargetPos, 0.15);
+
+                    // Look in the direction Pac-Man is facing
+                    const lookX = pacman.position.x + Math.sin(dirAngle) * config.lookDistance;
+                    const lookY = config.eyeHeight + (pacmanY - GROUND_Y);
+                    const lookZ = pacman.position.z + Math.cos(dirAngle) * config.lookDistance;
+
+                    cameraTargetLook.lerp(new THREE.Vector3(lookX, lookY, lookZ), 0.08);
+                    camera.lookAt(cameraTargetLook);
+                }
             }
 
             // Floating animation for dots

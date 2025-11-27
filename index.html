@@ -289,6 +289,13 @@
         const CAMERA_PITCH_MIN = -0.1;  // Limit looking down (prevent underground view)
         const CAMERA_PITCH_MAX = 1.2;   // Limit looking up (almost top-down)
 
+        // FPS camera angles (Resident Evil style free look)
+        let fpsYawAngle = 0;      // Horizontal look direction
+        let fpsPitchAngle = 0;    // Vertical look direction
+        const FPS_LOOK_SPEED = 0.06;
+        const FPS_PITCH_MIN = -0.6;  // Limit looking down
+        const FPS_PITCH_MAX = 0.5;   // Limit looking up
+
         // Maze layout (1 = wall, 0 = path, 2 = dot, 3 = power pellet, 4 = ghost spawn)
         const maze = [
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -1280,19 +1287,43 @@
             return { forward, backward, left, right };
         }
 
-        // Get character-relative directions (for FPS mode)
-        function getCharacterRelativeDirections() {
-            let dir = pacmanDir;
-            if (dir.x === 0 && dir.z === 0) {
-                dir = { x: 0, z: -1 }; // Default facing up
+        // Get FPS look-relative directions (Resident Evil style - move where you look)
+        function getFPSLookRelativeDirections() {
+            // Use the FPS yaw angle to determine movement directions
+            // This allows movement relative to where you're LOOKING, not where Pac-Man faces
+            const lookX = Math.sin(fpsYawAngle);
+            const lookZ = Math.cos(fpsYawAngle);
+
+            // Snap to nearest cardinal direction for grid-based movement
+            let forward, backward, left, right;
+
+            if (Math.abs(lookZ) >= Math.abs(lookX)) {
+                if (lookZ > 0) {
+                    forward = { x: 0, z: 1 };
+                    backward = { x: 0, z: -1 };
+                    left = { x: -1, z: 0 };
+                    right = { x: 1, z: 0 };
+                } else {
+                    forward = { x: 0, z: -1 };
+                    backward = { x: 0, z: 1 };
+                    left = { x: 1, z: 0 };
+                    right = { x: -1, z: 0 };
+                }
+            } else {
+                if (lookX > 0) {
+                    forward = { x: 1, z: 0 };
+                    backward = { x: -1, z: 0 };
+                    left = { x: 0, z: 1 };
+                    right = { x: 0, z: -1 };
+                } else {
+                    forward = { x: -1, z: 0 };
+                    backward = { x: 1, z: 0 };
+                    left = { x: 0, z: -1 };
+                    right = { x: 0, z: 1 };
+                }
             }
 
-            return {
-                forward: { x: dir.x, z: dir.z },
-                backward: { x: -dir.x, z: -dir.z },
-                left: { x: dir.z, z: -dir.x },
-                right: { x: -dir.z, z: dir.x }
-            };
+            return { forward, backward, left, right };
         }
 
         document.addEventListener('keydown', (e) => {
@@ -1312,8 +1343,8 @@
                 // Third-person mode - Assassin's Creed style (camera-relative)
                 dirs = getCameraRelativeDirections();
             } else {
-                // FPS mode - character-relative (move where you're looking)
-                dirs = getCharacterRelativeDirections();
+                // FPS mode - Resident Evil style (move relative to where you're looking)
+                dirs = getFPSLookRelativeDirections();
             }
 
             if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
@@ -1432,8 +1463,8 @@
                     // Third-person mode - Assassin's Creed style (camera-relative)
                     dirs = getCameraRelativeDirections();
                 } else {
-                    // FPS mode - character-relative
-                    dirs = getCharacterRelativeDirections();
+                    // FPS mode - Resident Evil style (move relative to where you're looking)
+                    dirs = getFPSLookRelativeDirections();
                 }
 
                 // Apply direction based on stick/dpad input
@@ -1444,20 +1475,27 @@
                 }
             }
 
-            // Right stick for camera rotation (only in 3rd person mode)
-            if (cameraMode === 2) {
-                const rightStickX = gamepad.axes[2] || 0;
-                const rightStickY = gamepad.axes[3] || 0;
+            // Right stick for camera control
+            const rightStickX = gamepad.axes[2] || 0;
+            const rightStickY = gamepad.axes[3] || 0;
 
-                // Horizontal rotation (orbit around Pac-Man)
+            if (cameraMode === 2) {
+                // 3rd person mode - orbit camera around Pac-Man
                 if (Math.abs(rightStickX) > STICK_DEADZONE) {
                     cameraOrbitAngle += rightStickX * CAMERA_ROTATE_SPEED;
                 }
-
-                // Vertical rotation (pitch up/down with limits)
                 if (Math.abs(rightStickY) > STICK_DEADZONE) {
-                    cameraPitchAngle -= rightStickY * CAMERA_PITCH_SPEED; // Inverted for natural feel
+                    cameraPitchAngle -= rightStickY * CAMERA_PITCH_SPEED;
                     cameraPitchAngle = Math.max(CAMERA_PITCH_MIN, Math.min(CAMERA_PITCH_MAX, cameraPitchAngle));
+                }
+            } else if (cameraMode === 3) {
+                // FPS mode - Resident Evil style free look
+                if (Math.abs(rightStickX) > STICK_DEADZONE) {
+                    fpsYawAngle += rightStickX * FPS_LOOK_SPEED;
+                }
+                if (Math.abs(rightStickY) > STICK_DEADZONE) {
+                    fpsPitchAngle -= rightStickY * FPS_LOOK_SPEED; // Inverted for natural feel
+                    fpsPitchAngle = Math.max(FPS_PITCH_MIN, Math.min(FPS_PITCH_MAX, fpsPitchAngle));
                 }
             }
 
@@ -1568,7 +1606,7 @@
                     camera.lookAt(cameraTargetLook);
 
                 } else if (cameraMode === 3) {
-                    // FPS mode - at Pac-Man's eye level
+                    // FPS mode - Resident Evil style free look at Pac-Man's eye level
                     const targetX = pacman.position.x;
                     const targetY = config.eyeHeight + (pacmanY - GROUND_Y);
                     const targetZ = pacman.position.z;
@@ -1576,10 +1614,11 @@
                     cameraTargetPos.set(targetX, targetY, targetZ);
                     camera.position.lerp(cameraTargetPos, 0.15);
 
-                    // Look in the direction Pac-Man is facing
-                    const lookX = pacman.position.x + Math.sin(dirAngle) * config.lookDistance;
-                    const lookY = config.eyeHeight + (pacmanY - GROUND_Y);
-                    const lookZ = pacman.position.z + Math.cos(dirAngle) * config.lookDistance;
+                    // Look in the direction controlled by right stick (free look)
+                    const lookDistance = config.lookDistance;
+                    const lookX = pacman.position.x + Math.sin(fpsYawAngle) * lookDistance * Math.cos(fpsPitchAngle);
+                    const lookY = config.eyeHeight + (pacmanY - GROUND_Y) + Math.sin(fpsPitchAngle) * lookDistance;
+                    const lookZ = pacman.position.z + Math.cos(fpsYawAngle) * lookDistance * Math.cos(fpsPitchAngle);
 
                     cameraTargetLook.lerp(new THREE.Vector3(lookX, lookY, lookZ), 0.08);
                     camera.lookAt(cameraTargetLook);

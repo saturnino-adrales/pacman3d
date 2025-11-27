@@ -1225,9 +1225,55 @@
 
         // Keyboard input
         const keys = {};
-        // Get camera-relative directions based on Pac-Man's facing
-        function getRelativeDirections() {
-            // Use current direction, default to "up" if stationary
+
+        // Get camera-relative directions (Assassin's Creed style)
+        // Movement is based on camera orientation, not character facing
+        function getCameraRelativeDirections() {
+            // Get camera's forward direction
+            const cameraForward = new THREE.Vector3();
+            camera.getWorldDirection(cameraForward);
+
+            // Project onto XZ plane (ignore Y component)
+            cameraForward.y = 0;
+            cameraForward.normalize();
+
+            // Snap to nearest cardinal direction for grid-based movement
+            let forward, backward, left, right;
+
+            // Determine which axis the camera is mostly facing
+            if (Math.abs(cameraForward.z) >= Math.abs(cameraForward.x)) {
+                // Camera mostly facing along Z axis
+                if (cameraForward.z < 0) {
+                    forward = { x: 0, z: -1 };
+                    backward = { x: 0, z: 1 };
+                    left = { x: -1, z: 0 };
+                    right = { x: 1, z: 0 };
+                } else {
+                    forward = { x: 0, z: 1 };
+                    backward = { x: 0, z: -1 };
+                    left = { x: 1, z: 0 };
+                    right = { x: -1, z: 0 };
+                }
+            } else {
+                // Camera mostly facing along X axis
+                if (cameraForward.x < 0) {
+                    forward = { x: -1, z: 0 };
+                    backward = { x: 1, z: 0 };
+                    left = { x: 0, z: 1 };
+                    right = { x: 0, z: -1 };
+                } else {
+                    forward = { x: 1, z: 0 };
+                    backward = { x: -1, z: 0 };
+                    left = { x: 0, z: -1 };
+                    right = { x: 0, z: 1 };
+                }
+            }
+
+            return { forward, backward, left, right };
+        }
+
+        // Get character-relative directions (for FPS mode)
+        function getCharacterRelativeDirections() {
             let dir = pacmanDir;
             if (dir.x === 0 && dir.z === 0) {
                 dir = { x: 0, z: -1 }; // Default facing up
@@ -1236,39 +1282,40 @@
             return {
                 forward: { x: dir.x, z: dir.z },
                 backward: { x: -dir.x, z: -dir.z },
-                left: { x: dir.z, z: -dir.x },    // Rotate 90° left
-                right: { x: -dir.z, z: dir.x }    // Rotate 90° right
+                left: { x: dir.z, z: -dir.x },
+                right: { x: -dir.z, z: dir.x }
             };
         }
 
         document.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
 
-            // Classic mode uses absolute directions, other modes use relative
+            // Get directions based on camera mode
+            let dirs;
             if (cameraMode === 1) {
                 // Classic mode - absolute directions (original Pac-Man style)
-                if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
-                    nextDir = { x: 0, z: -1 }; // Up
-                } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
-                    nextDir = { x: 0, z: 1 }; // Down
-                } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
-                    nextDir = { x: -1, z: 0 }; // Left
-                } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
-                    nextDir = { x: 1, z: 0 }; // Right
-                }
+                dirs = {
+                    forward: { x: 0, z: -1 },  // Up on screen
+                    backward: { x: 0, z: 1 },  // Down on screen
+                    left: { x: -1, z: 0 },     // Left on screen
+                    right: { x: 1, z: 0 }      // Right on screen
+                };
+            } else if (cameraMode === 2) {
+                // Third-person mode - Assassin's Creed style (camera-relative)
+                dirs = getCameraRelativeDirections();
             } else {
-                // Third-person and FPS modes - relative to Pac-Man's facing direction
-                const dirs = getRelativeDirections();
+                // FPS mode - character-relative (move where you're looking)
+                dirs = getCharacterRelativeDirections();
+            }
 
-                if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
-                    nextDir = dirs.forward;
-                } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
-                    nextDir = dirs.backward;
-                } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
-                    nextDir = dirs.left;
-                } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
-                    nextDir = dirs.right;
-                }
+            if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+                nextDir = dirs.forward;
+            } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
+                nextDir = dirs.backward;
+            } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+                nextDir = dirs.left;
+            } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+                nextDir = dirs.right;
             }
 
             // Jump with spacebar
@@ -1363,22 +1410,29 @@
 
             // Set direction based on camera mode
             if (inputX !== 0 || inputY !== 0) {
+                // Get directions based on camera mode
+                let dirs;
                 if (cameraMode === 1) {
                     // Classic mode - absolute directions
-                    // Prioritize the stronger axis
-                    if (Math.abs(inputY) >= Math.abs(inputX)) {
-                        nextDir = { x: 0, z: inputY };
-                    } else {
-                        nextDir = { x: inputX, z: 0 };
-                    }
+                    dirs = {
+                        forward: { x: 0, z: -1 },
+                        backward: { x: 0, z: 1 },
+                        left: { x: -1, z: 0 },
+                        right: { x: 1, z: 0 }
+                    };
+                } else if (cameraMode === 2) {
+                    // Third-person mode - Assassin's Creed style (camera-relative)
+                    dirs = getCameraRelativeDirections();
                 } else {
-                    // Third-person and FPS modes - relative directions
-                    const dirs = getRelativeDirections();
-                    if (Math.abs(inputY) >= Math.abs(inputX)) {
-                        nextDir = inputY < 0 ? dirs.forward : dirs.backward;
-                    } else {
-                        nextDir = inputX < 0 ? dirs.left : dirs.right;
-                    }
+                    // FPS mode - character-relative
+                    dirs = getCharacterRelativeDirections();
+                }
+
+                // Apply direction based on stick/dpad input
+                if (Math.abs(inputY) >= Math.abs(inputX)) {
+                    nextDir = inputY < 0 ? dirs.forward : dirs.backward;
+                } else {
+                    nextDir = inputX < 0 ? dirs.left : dirs.right;
                 }
             }
 

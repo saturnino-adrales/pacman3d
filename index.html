@@ -283,7 +283,11 @@
 
         // Camera orbit angle for 3rd person mode (controlled by right stick)
         let cameraOrbitAngle = 0;
+        let cameraPitchAngle = 0.3; // Start slightly above (0 = level, positive = higher)
         const CAMERA_ROTATE_SPEED = 0.05;
+        const CAMERA_PITCH_SPEED = 0.03;
+        const CAMERA_PITCH_MIN = -0.1;  // Limit looking down (prevent underground view)
+        const CAMERA_PITCH_MAX = 1.2;   // Limit looking up (almost top-down)
 
         // Maze layout (1 = wall, 0 = path, 2 = dot, 3 = power pellet, 4 = ghost spawn)
         const maze = [
@@ -1443,8 +1447,17 @@
             // Right stick for camera rotation (only in 3rd person mode)
             if (cameraMode === 2) {
                 const rightStickX = gamepad.axes[2] || 0;
+                const rightStickY = gamepad.axes[3] || 0;
+
+                // Horizontal rotation (orbit around Pac-Man)
                 if (Math.abs(rightStickX) > STICK_DEADZONE) {
                     cameraOrbitAngle += rightStickX * CAMERA_ROTATE_SPEED;
+                }
+
+                // Vertical rotation (pitch up/down with limits)
+                if (Math.abs(rightStickY) > STICK_DEADZONE) {
+                    cameraPitchAngle -= rightStickY * CAMERA_PITCH_SPEED; // Inverted for natural feel
+                    cameraPitchAngle = Math.max(CAMERA_PITCH_MIN, Math.min(CAMERA_PITCH_MAX, cameraPitchAngle));
                 }
             }
 
@@ -1534,18 +1547,21 @@
                     camera.lookAt(cameraTargetLook);
 
                 } else if (cameraMode === 2) {
-                    // Third-person mode - orbit camera around Pac-Man
-                    // Use cameraOrbitAngle (controlled by right stick) for camera position
-                    const targetX = pacman.position.x - Math.sin(cameraOrbitAngle) * config.offsetZ;
-                    const targetY = config.offsetY + (pacmanY - GROUND_Y);
-                    const targetZ = pacman.position.z - Math.cos(cameraOrbitAngle) * config.offsetZ;
+                    // Third-person mode - orbit camera around Pac-Man with pitch control
+                    // Calculate camera position using orbit angle and pitch
+                    const horizontalDist = config.offsetZ * Math.cos(cameraPitchAngle);
+                    const verticalOffset = config.offsetY + config.offsetZ * Math.sin(cameraPitchAngle);
+
+                    const targetX = pacman.position.x - Math.sin(cameraOrbitAngle) * horizontalDist;
+                    const targetY = verticalOffset + (pacmanY - GROUND_Y);
+                    const targetZ = pacman.position.z - Math.cos(cameraOrbitAngle) * horizontalDist;
 
                     cameraTargetPos.set(targetX, targetY, targetZ);
                     camera.position.lerp(cameraTargetPos, 0.05);
 
                     // Always look at Pac-Man
                     const lookX = pacman.position.x;
-                    const lookY = 1.5;
+                    const lookY = 1.0 + (pacmanY - GROUND_Y);
                     const lookZ = pacman.position.z;
 
                     cameraTargetLook.lerp(new THREE.Vector3(lookX, lookY, lookZ), 0.05);

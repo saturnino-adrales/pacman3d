@@ -1288,6 +1288,126 @@
             keys[e.key.toLowerCase()] = false;
         });
 
+        // Gamepad support for Xbox controller
+        let gamepadIndex = null;
+        let prevGamepadButtons = {};
+        const STICK_DEADZONE = 0.3;
+
+        // Detect gamepad connection
+        window.addEventListener('gamepadconnected', (e) => {
+            console.log('Gamepad connected:', e.gamepad.id);
+            gamepadIndex = e.gamepad.index;
+            // Update instructions to show gamepad connected
+            const instructions = document.getElementById('instructions');
+            if (instructions) {
+                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad to move | A to jump | LB/RB to change camera';
+            }
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            console.log('Gamepad disconnected:', e.gamepad.id);
+            if (gamepadIndex === e.gamepad.index) {
+                gamepadIndex = null;
+            }
+            // Restore keyboard instructions
+            const instructions = document.getElementById('instructions');
+            if (instructions) {
+                instructions.innerHTML = 'WASD or Arrow Keys to move | SPACE to jump | 1/2/3 to change camera mode | Collect all dots to win!';
+            }
+        });
+
+        // Poll gamepad input (called in animate loop)
+        function updateGamepad() {
+            if (gamepadIndex === null) return;
+
+            const gamepads = navigator.getGamepads();
+            const gamepad = gamepads[gamepadIndex];
+            if (!gamepad) return;
+
+            // Start game with any button if not started
+            if (!gameStarted) {
+                for (let i = 0; i < gamepad.buttons.length; i++) {
+                    if (gamepad.buttons[i].pressed) {
+                        const startScreen = document.getElementById('startScreen');
+                        if (startScreen && startScreen.style.display !== 'none') {
+                            startScreen.click();
+                        }
+                        break;
+                    }
+                }
+                return;
+            }
+
+            // Left stick axes (0 = left/right, 1 = up/down)
+            const leftStickX = gamepad.axes[0];
+            const leftStickY = gamepad.axes[1];
+
+            // D-pad buttons (Xbox: 12=up, 13=down, 14=left, 15=right)
+            const dpadUp = gamepad.buttons[12]?.pressed;
+            const dpadDown = gamepad.buttons[13]?.pressed;
+            const dpadLeft = gamepad.buttons[14]?.pressed;
+            const dpadRight = gamepad.buttons[15]?.pressed;
+
+            // Determine direction from stick or d-pad
+            let inputX = 0;
+            let inputY = 0;
+
+            // Prefer D-pad if pressed, otherwise use stick
+            if (dpadUp) inputY = -1;
+            else if (dpadDown) inputY = 1;
+            else if (Math.abs(leftStickY) > STICK_DEADZONE) inputY = leftStickY > 0 ? 1 : -1;
+
+            if (dpadLeft) inputX = -1;
+            else if (dpadRight) inputX = 1;
+            else if (Math.abs(leftStickX) > STICK_DEADZONE) inputX = leftStickX > 0 ? 1 : -1;
+
+            // Set direction based on camera mode
+            if (inputX !== 0 || inputY !== 0) {
+                if (cameraMode === 1) {
+                    // Classic mode - absolute directions
+                    // Prioritize the stronger axis
+                    if (Math.abs(inputY) >= Math.abs(inputX)) {
+                        nextDir = { x: 0, z: inputY };
+                    } else {
+                        nextDir = { x: inputX, z: 0 };
+                    }
+                } else {
+                    // Third-person and FPS modes - relative directions
+                    const dirs = getRelativeDirections();
+                    if (Math.abs(inputY) >= Math.abs(inputX)) {
+                        nextDir = inputY < 0 ? dirs.forward : dirs.backward;
+                    } else {
+                        nextDir = inputX < 0 ? dirs.left : dirs.right;
+                    }
+                }
+            }
+
+            // A button (index 0) for jump
+            const aButton = gamepad.buttons[0]?.pressed;
+            if (aButton && !prevGamepadButtons.a && !isJumping && gameRunning) {
+                isJumping = true;
+                jumpVelocity = JUMP_FORCE;
+                playJumpSound();
+            }
+            prevGamepadButtons.a = aButton;
+
+            // LB (index 4) - previous camera mode
+            const lbButton = gamepad.buttons[4]?.pressed;
+            if (lbButton && !prevGamepadButtons.lb) {
+                const newMode = cameraMode === 1 ? 3 : cameraMode - 1;
+                setCameraMode(newMode);
+            }
+            prevGamepadButtons.lb = lbButton;
+
+            // RB (index 5) - next camera mode
+            const rbButton = gamepad.buttons[5]?.pressed;
+            if (rbButton && !prevGamepadButtons.rb) {
+                const newMode = cameraMode === 3 ? 1 : cameraMode + 1;
+                setCameraMode(newMode);
+            }
+            prevGamepadButtons.rb = rbButton;
+        }
+
         // Initialize game
         function init() {
             createFloor();
@@ -1326,6 +1446,7 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            updateGamepad();
             updatePacman();
             updateGhosts();
 

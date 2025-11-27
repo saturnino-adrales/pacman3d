@@ -1300,7 +1300,7 @@
             // Update instructions to show gamepad connected
             const instructions = document.getElementById('instructions');
             if (instructions) {
-                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad: move | A: jump | LB/RB: camera | L2: fullscreen';
+                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad: move | A: jump | LB/RB: camera | LT: fullscreen';
             }
         });
 
@@ -1407,12 +1407,15 @@
             }
             prevGamepadButtons.rb = rbButton;
 
-            // L2 (index 6) - toggle fullscreen
-            const l2Button = gamepad.buttons[6]?.pressed;
-            if (l2Button && !prevGamepadButtons.l2) {
+            // LT/L2 - toggle fullscreen
+            // Triggers can be buttons (index 6) OR axes (index 2) depending on browser/controller
+            const ltButton = gamepad.buttons[6]?.pressed || gamepad.buttons[6]?.value > 0.5;
+            const ltAxis = gamepad.axes[2] !== undefined ? gamepad.axes[2] > 0.5 : false;
+            const ltPressed = ltButton || ltAxis;
+            if (ltPressed && !prevGamepadButtons.lt) {
                 toggleFullscreen();
             }
-            prevGamepadButtons.l2 = l2Button;
+            prevGamepadButtons.lt = ltPressed;
         }
 
         // Fullscreen toggle function

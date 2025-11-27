@@ -1300,7 +1300,7 @@
             // Update instructions to show gamepad connected
             const instructions = document.getElementById('instructions');
             if (instructions) {
-                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad: move | A: jump | LB: camera | RB: fullscreen';
+                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad to move | A to jump | LB/RB to change camera';
             }
         });
 
@@ -1391,40 +1391,21 @@
             }
             prevGamepadButtons.a = aButton;
 
-            // LB (index 4) - cycle camera mode
+            // LB (index 4) - previous camera mode
             const lbButton = gamepad.buttons[4]?.pressed;
             if (lbButton && !prevGamepadButtons.lb) {
-                const newMode = cameraMode === 3 ? 1 : cameraMode + 1;
+                const newMode = cameraMode === 1 ? 3 : cameraMode - 1;
                 setCameraMode(newMode);
             }
             prevGamepadButtons.lb = lbButton;
 
-            // RB (index 5) - toggle fullscreen
+            // RB (index 5) - next camera mode
             const rbButton = gamepad.buttons[5]?.pressed;
             if (rbButton && !prevGamepadButtons.rb) {
-                toggleFullscreen();
+                const newMode = cameraMode === 3 ? 1 : cameraMode + 1;
+                setCameraMode(newMode);
             }
             prevGamepadButtons.rb = rbButton;
-        }
-
-        // Fullscreen toggle function
-        function toggleFullscreen() {
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                // Enter fullscreen
-                const elem = document.documentElement;
-                if (elem.requestFullscreen) {
-                    elem.requestFullscreen();
-                } else if (elem.webkitRequestFullscreen) {
-                    elem.webkitRequestFullscreen(); // Safari/iOS
-                }
-            } else {
-                // Exit fullscreen
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen(); // Safari/iOS
-                }
-            }
         }
 
         // Initialize game

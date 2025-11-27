@@ -281,6 +281,10 @@
             3: { name: 'FPS', eyeHeight: 1.2, lookDistance: 10, fov: 90 }
         };
 
+        // Camera orbit angle for 3rd person mode (controlled by right stick)
+        let cameraOrbitAngle = 0;
+        const CAMERA_ROTATE_SPEED = 0.05;
+
         // Maze layout (1 = wall, 0 = path, 2 = dot, 3 = power pellet, 4 = ghost spawn)
         const maze = [
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -1347,7 +1351,7 @@
             // Update instructions to show gamepad connected
             const instructions = document.getElementById('instructions');
             if (instructions) {
-                instructions.innerHTML = '🎮 Controller connected! Left Stick/D-Pad to move | A to jump | LB/RB to change camera';
+                instructions.innerHTML = '🎮 Controller connected! Left Stick: move | Right Stick: rotate camera | A: jump | LB/RB: change mode';
             }
         });
 
@@ -1433,6 +1437,14 @@
                     nextDir = inputY < 0 ? dirs.forward : dirs.backward;
                 } else {
                     nextDir = inputX < 0 ? dirs.left : dirs.right;
+                }
+            }
+
+            // Right stick for camera rotation (only in 3rd person mode)
+            if (cameraMode === 2) {
+                const rightStickX = gamepad.axes[2] || 0;
+                if (Math.abs(rightStickX) > STICK_DEADZONE) {
+                    cameraOrbitAngle += rightStickX * CAMERA_ROTATE_SPEED;
                 }
             }
 
@@ -1522,20 +1534,21 @@
                     camera.lookAt(cameraTargetLook);
 
                 } else if (cameraMode === 2) {
-                    // Third-person mode - follow behind Pac-Man
-                    const targetX = pacman.position.x - Math.sin(dirAngle) * config.offsetZ;
+                    // Third-person mode - orbit camera around Pac-Man
+                    // Use cameraOrbitAngle (controlled by right stick) for camera position
+                    const targetX = pacman.position.x - Math.sin(cameraOrbitAngle) * config.offsetZ;
                     const targetY = config.offsetY + (pacmanY - GROUND_Y);
-                    const targetZ = pacman.position.z - Math.cos(dirAngle) * config.offsetZ;
+                    const targetZ = pacman.position.z - Math.cos(cameraOrbitAngle) * config.offsetZ;
 
                     cameraTargetPos.set(targetX, targetY, targetZ);
-                    camera.position.lerp(cameraTargetPos, 0.015);
+                    camera.position.lerp(cameraTargetPos, 0.05);
 
-                    // Look ahead of Pac-Man
-                    const lookX = pacman.position.x + Math.sin(dirAngle) * config.lookAhead;
+                    // Always look at Pac-Man
+                    const lookX = pacman.position.x;
                     const lookY = 1.5;
-                    const lookZ = pacman.position.z + Math.cos(dirAngle) * config.lookAhead;
+                    const lookZ = pacman.position.z;
 
-                    cameraTargetLook.lerp(new THREE.Vector3(lookX, lookY, lookZ), 0.02);
+                    cameraTargetLook.lerp(new THREE.Vector3(lookX, lookY, lookZ), 0.05);
                     camera.lookAt(cameraTargetLook);
 
                 } else if (cameraMode === 3) {

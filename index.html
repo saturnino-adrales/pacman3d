@@ -627,6 +627,107 @@
         const ghostColors = [0xff0000, 0x00ffff, 0xffb8ff, 0xffb852];
         const scaredGhostMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff, emissive: 0x000044 });
 
+        // Ethereal ghost shader for flowing, transparent appearance
+        const ghostVertexShader = `
+            uniform float time;
+            uniform float waveIntensity;
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+            varying float vDistFromTop;
+
+            void main() {
+                vNormal = normalize(normalMatrix * normal);
+                vPosition = position;
+
+                // Calculate distance from top (for fade effect at bottom)
+                vDistFromTop = 1.0 - (position.y + 0.7) / 1.4;
+
+                // Wave displacement for ethereal effect
+                vec3 pos = position;
+
+                // More intense waves at the bottom
+                float bottomFactor = max(0.0, -position.y / 0.7);
+                float waveAmount = bottomFactor * waveIntensity;
+
+                // Multiple wave frequencies for organic feel
+                pos.x += sin(time * 2.0 + position.y * 5.0) * waveAmount * 0.15;
+                pos.z += cos(time * 1.5 + position.y * 4.0 + position.x * 2.0) * waveAmount * 0.15;
+
+                // Vertical stretching wave at bottom
+                if (position.y < -0.3) {
+                    pos.y += sin(time * 3.0 + position.x * 4.0) * bottomFactor * 0.1;
+                }
+
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `;
+
+        const ghostFragmentShader = `
+            uniform vec3 glowColor;
+            uniform float time;
+            uniform float opacity;
+            uniform bool isScared;
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+            varying float vDistFromTop;
+
+            void main() {
+                // Base color with inner glow
+                vec3 baseColor = isScared ? vec3(0.0, 0.0, 1.0) : glowColor;
+
+                // Fresnel effect for edge glow
+                vec3 viewDir = normalize(cameraPosition - vPosition);
+                float fresnel = pow(1.0 - max(dot(vNormal, viewDir), 0.0), 2.0);
+
+                // Ethereal pulsing
+                float pulse = 0.8 + sin(time * 2.0) * 0.2;
+
+                // Core glow (brighter in center)
+                float coreBrightness = 1.0 - fresnel * 0.5;
+
+                // Edge glow effect
+                vec3 edgeGlow = baseColor * fresnel * 1.5;
+
+                // Combine for ethereal look
+                vec3 finalColor = baseColor * coreBrightness * pulse + edgeGlow;
+
+                // Add subtle inner light variation
+                finalColor += baseColor * sin(time * 3.0 + vPosition.y * 10.0) * 0.1;
+
+                // Fade out at bottom for flowing effect
+                float fadeAlpha = 1.0 - smoothstep(0.3, 1.0, vDistFromTop);
+
+                // Add noise-like edge dissolution
+                float noise = fract(sin(dot(vPosition.xy * 50.0 + time, vec2(12.9898, 78.233))) * 43758.5453);
+                float edgeDissolution = smoothstep(0.7, 1.0, vDistFromTop) * noise;
+                fadeAlpha = max(0.0, fadeAlpha - edgeDissolution * 0.5);
+
+                // Final opacity with base transparency
+                float finalAlpha = opacity * fadeAlpha * (0.7 + fresnel * 0.3);
+
+                gl_FragColor = vec4(finalColor, finalAlpha);
+            }
+        `;
+
+        // Create ethereal ghost material
+        function createGhostMaterial(color) {
+            return new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    glowColor: { value: new THREE.Color(color) },
+                    waveIntensity: { value: 1.0 },
+                    opacity: { value: 0.85 },
+                    isScared: { value: false }
+                },
+                vertexShader: ghostVertexShader,
+                fragmentShader: ghostFragmentShader,
+                transparent: true,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+        }
+
         // Game objects
         let pacman;
         let ghosts = [];
@@ -814,6 +915,94 @@
             scene.add(pacman);
         }
 
+        // Create custom ethereal ghost geometry with flowing bottom
+        function createEtherealGhostGeometry() {
+            // Custom geometry combining dome top with flowing tendrils at bottom
+            const segments = 32;
+            const rings = 24;
+            const radius = 0.7;
+
+            const positions = [];
+            const normals = [];
+            const uvs = [];
+            const indices = [];
+
+            // Create dome top (hemisphere)
+            for (let ring = 0; ring <= rings / 2; ring++) {
+                const phi = (ring / (rings / 2)) * Math.PI / 2; // 0 to PI/2
+                const y = Math.cos(phi) * radius;
+                const ringRadius = Math.sin(phi) * radius;
+
+                for (let seg = 0; seg <= segments; seg++) {
+                    const theta = (seg / segments) * Math.PI * 2;
+                    const x = Math.cos(theta) * ringRadius;
+                    const z = Math.sin(theta) * ringRadius;
+
+                    positions.push(x, y + 0.3, z);
+                    normals.push(x / radius, y / radius, z / radius);
+                    uvs.push(seg / segments, ring / rings);
+                }
+            }
+
+            // Create flowing bottom section with wavy tendrils
+            const bottomRings = rings / 2;
+            const tendrilCount = 8;
+
+            for (let ring = 0; ring <= bottomRings; ring++) {
+                const t = ring / bottomRings;
+                const y = -t * 0.7 + 0.3; // Extends downward
+                const baseRadius = radius * (1 - t * 0.3); // Slight taper
+
+                for (let seg = 0; seg <= segments; seg++) {
+                    const theta = (seg / segments) * Math.PI * 2;
+
+                    // Add tendril waviness
+                    const tendrilPhase = Math.sin(theta * tendrilCount) * 0.5 + 0.5;
+                    const tendrilExtend = tendrilPhase * t * 0.3;
+                    const currentRadius = baseRadius + tendrilExtend;
+
+                    // Add noise-like variation
+                    const noise = Math.sin(theta * 7 + t * 5) * 0.05 * t;
+
+                    const x = Math.cos(theta) * (currentRadius + noise);
+                    const z = Math.sin(theta) * (currentRadius + noise);
+
+                    positions.push(x, y, z);
+
+                    // Normal pointing outward with some downward blend
+                    const nx = Math.cos(theta);
+                    const nz = Math.sin(theta);
+                    const ny = -t * 0.5;
+                    const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+                    normals.push(nx / len, ny / len, nz / len);
+
+                    uvs.push(seg / segments, 0.5 + ring / rings * 0.5);
+                }
+            }
+
+            // Create indices for triangles
+            const vertsPerRing = segments + 1;
+            const totalRings = rings / 2 + bottomRings;
+
+            for (let ring = 0; ring < totalRings; ring++) {
+                for (let seg = 0; seg < segments; seg++) {
+                    const curr = ring * vertsPerRing + seg;
+                    const next = curr + vertsPerRing;
+
+                    indices.push(curr, next, curr + 1);
+                    indices.push(curr + 1, next, next + 1);
+                }
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geometry.setIndex(indices);
+
+            return geometry;
+        }
+
         // Create ghosts
         function createGhosts() {
             const ghostSpawns = [];
@@ -825,48 +1014,82 @@
                 }
             }
 
+            const etherealGeometry = createEtherealGhostGeometry();
+
             ghostSpawns.forEach((spawn, index) => {
                 const ghostGroup = new THREE.Group();
+                const ghostColor = ghostColors[index % ghostColors.length];
 
-                // Ghost body
-                const bodyGeometry = new THREE.SphereGeometry(0.7, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
-                const bodyMaterial = new THREE.MeshPhongMaterial({
-                    color: ghostColors[index % ghostColors.length],
-                    emissive: ghostColors[index % ghostColors.length],
-                    emissiveIntensity: 0.2
-                });
-                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-                body.rotation.x = Math.PI;
-                body.position.y = 0.7;
+                // Main ethereal body with custom shader
+                const ghostMaterial = createGhostMaterial(ghostColor);
+                const body = new THREE.Mesh(etherealGeometry, ghostMaterial);
+                body.position.y = 0.5;
                 ghostGroup.add(body);
 
-                // Ghost skirt
-                const skirtGeometry = new THREE.CylinderGeometry(0.7, 0.7, 0.7, 32);
-                const skirt = new THREE.Mesh(skirtGeometry, bodyMaterial);
-                skirt.position.y = 0.35;
-                ghostGroup.add(skirt);
+                // Inner glow core (smaller, more opaque)
+                const coreGeometry = new THREE.SphereGeometry(0.4, 16, 16);
+                const coreMaterial = new THREE.MeshBasicMaterial({
+                    color: ghostColor,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const core = new THREE.Mesh(coreGeometry, coreMaterial);
+                core.position.y = 0.6;
+                ghostGroup.add(core);
 
-                // Eyes
-                const eyeGeometry = new THREE.SphereGeometry(0.15, 16, 16);
-                const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
-                const pupilGeometry = new THREE.SphereGeometry(0.08, 16, 16);
-                const pupilMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+                // Floating particle trails (small spheres)
+                const particleGroup = new THREE.Group();
+                const particleGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+                const particleMaterial = new THREE.MeshBasicMaterial({
+                    color: ghostColor,
+                    transparent: true,
+                    opacity: 0.6
+                });
+
+                for (let i = 0; i < 12; i++) {
+                    const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
+                    particle.userData.angle = (i / 12) * Math.PI * 2;
+                    particle.userData.yOffset = Math.random() * 0.5;
+                    particle.userData.radius = 0.3 + Math.random() * 0.3;
+                    particle.userData.speed = 0.5 + Math.random() * 0.5;
+                    particleGroup.add(particle);
+                }
+                ghostGroup.add(particleGroup);
+
+                // Eyes (ethereal glow effect)
+                const eyeGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+                const eyeMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                const pupilGeometry = new THREE.SphereGeometry(0.06, 16, 16);
+                const pupilMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x000000,
+                    transparent: true,
+                    opacity: 0.95
+                });
 
                 const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-                leftEye.position.set(-0.25, 0.8, 0.5);
+                leftEye.position.set(-0.2, 0.75, 0.45);
                 ghostGroup.add(leftEye);
 
                 const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-                rightEye.position.set(0.25, 0.8, 0.5);
+                rightEye.position.set(0.2, 0.75, 0.45);
                 ghostGroup.add(rightEye);
 
                 const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-                leftPupil.position.set(-0.25, 0.8, 0.6);
+                leftPupil.position.set(-0.2, 0.75, 0.52);
                 ghostGroup.add(leftPupil);
 
                 const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-                rightPupil.position.set(0.25, 0.8, 0.6);
+                rightPupil.position.set(0.2, 0.75, 0.52);
                 ghostGroup.add(rightPupil);
+
+                // Point light for ethereal glow
+                const ghostLight = new THREE.PointLight(ghostColor, 0.5, 8);
+                ghostLight.position.y = 0.5;
+                ghostGroup.add(ghostLight);
 
                 ghostGroup.position.set(
                     spawn.x * CELL_SIZE + CELL_SIZE / 2,
@@ -878,13 +1101,16 @@
                     gridX: spawn.x,
                     gridZ: spawn.z,
                     dir: { x: 0, z: -1 },
-                    originalColor: ghostColors[index % ghostColors.length],
+                    originalColor: ghostColor,
                     bodyMesh: body,
-                    skirtMesh: skirt,
-                    scared: false
+                    ghostMaterial: ghostMaterial,
+                    coreMesh: core,
+                    particleGroup: particleGroup,
+                    ghostLight: ghostLight,
+                    scared: false,
+                    phaseOffset: Math.random() * Math.PI * 2
                 };
 
-                ghostGroup.castShadow = true;
                 scene.add(ghostGroup);
                 ghosts.push(ghostGroup);
             });
@@ -1035,12 +1261,29 @@
 
             ghosts.forEach(ghost => {
                 ghost.userData.scared = true;
-                const scaredMaterial = new THREE.MeshPhongMaterial({
-                    color: 0x0000ff,
-                    emissive: 0x000044
-                });
-                ghost.userData.bodyMesh.material = scaredMaterial;
-                ghost.userData.skirtMesh.material = scaredMaterial;
+
+                // Update shader to scared state
+                if (ghost.userData.ghostMaterial) {
+                    ghost.userData.ghostMaterial.uniforms.isScared.value = true;
+                    ghost.userData.ghostMaterial.uniforms.glowColor.value.setHex(0x0000ff);
+                }
+
+                // Update core to blue
+                if (ghost.userData.coreMesh) {
+                    ghost.userData.coreMesh.material.color.setHex(0x0000ff);
+                }
+
+                // Update particles to blue
+                if (ghost.userData.particleGroup) {
+                    ghost.userData.particleGroup.children.forEach(p => {
+                        p.material.color.setHex(0x0000ff);
+                    });
+                }
+
+                // Update ghost light to blue
+                if (ghost.userData.ghostLight) {
+                    ghost.userData.ghostLight.color.setHex(0x0000ff);
+                }
             });
 
             if (powerTimer) clearTimeout(powerTimer);
@@ -1048,13 +1291,29 @@
                 powerMode = false;
                 ghosts.forEach(ghost => {
                     ghost.userData.scared = false;
-                    const normalMaterial = new THREE.MeshPhongMaterial({
-                        color: ghost.userData.originalColor,
-                        emissive: ghost.userData.originalColor,
-                        emissiveIntensity: 0.2
-                    });
-                    ghost.userData.bodyMesh.material = normalMaterial;
-                    ghost.userData.skirtMesh.material = normalMaterial;
+
+                    // Restore shader to normal state
+                    if (ghost.userData.ghostMaterial) {
+                        ghost.userData.ghostMaterial.uniforms.isScared.value = false;
+                        ghost.userData.ghostMaterial.uniforms.glowColor.value.setHex(ghost.userData.originalColor);
+                    }
+
+                    // Restore core color
+                    if (ghost.userData.coreMesh) {
+                        ghost.userData.coreMesh.material.color.setHex(ghost.userData.originalColor);
+                    }
+
+                    // Restore particles color
+                    if (ghost.userData.particleGroup) {
+                        ghost.userData.particleGroup.children.forEach(p => {
+                            p.material.color.setHex(ghost.userData.originalColor);
+                        });
+                    }
+
+                    // Restore ghost light color
+                    if (ghost.userData.ghostLight) {
+                        ghost.userData.ghostLight.color.setHex(ghost.userData.originalColor);
+                    }
                 });
             }, POWER_DURATION);
         }
@@ -1171,13 +1430,28 @@
                     ghost.userData.gridZ = 9;
                     ghost.userData.scared = false;
 
-                    const normalMaterial = new THREE.MeshPhongMaterial({
-                        color: ghost.userData.originalColor,
-                        emissive: ghost.userData.originalColor,
-                        emissiveIntensity: 0.2
-                    });
-                    ghost.userData.bodyMesh.material = normalMaterial;
-                    ghost.userData.skirtMesh.material = normalMaterial;
+                    // Restore shader to normal state
+                    if (ghost.userData.ghostMaterial) {
+                        ghost.userData.ghostMaterial.uniforms.isScared.value = false;
+                        ghost.userData.ghostMaterial.uniforms.glowColor.value.setHex(ghost.userData.originalColor);
+                    }
+
+                    // Restore core color
+                    if (ghost.userData.coreMesh) {
+                        ghost.userData.coreMesh.material.color.setHex(ghost.userData.originalColor);
+                    }
+
+                    // Restore particles color
+                    if (ghost.userData.particleGroup) {
+                        ghost.userData.particleGroup.children.forEach(p => {
+                            p.material.color.setHex(ghost.userData.originalColor);
+                        });
+                    }
+
+                    // Restore ghost light color
+                    if (ghost.userData.ghostLight) {
+                        ghost.userData.ghostLight.color.setHex(ghost.userData.originalColor);
+                    }
                 } else {
                     // Pacman dies
                     loseLife();
@@ -1592,9 +1866,46 @@
                 dot.rotation.y += 0.02;
             });
 
-            // Ghost floating animation
+            // Ghost ethereal animation
+            const time = Date.now() * 0.001;
             ghosts.forEach((ghost, index) => {
-                ghost.position.y = Math.sin(Date.now() * 0.005 + index) * 0.1;
+                // Floating motion
+                ghost.position.y = Math.sin(time * 2 + ghost.userData.phaseOffset) * 0.15;
+
+                // Update shader time uniform for wavering effect
+                if (ghost.userData.ghostMaterial) {
+                    ghost.userData.ghostMaterial.uniforms.time.value = time + ghost.userData.phaseOffset;
+                }
+
+                // Animate core pulse
+                if (ghost.userData.coreMesh) {
+                    const pulseScale = 0.9 + Math.sin(time * 3 + ghost.userData.phaseOffset) * 0.1;
+                    ghost.userData.coreMesh.scale.set(pulseScale, pulseScale, pulseScale);
+                    ghost.userData.coreMesh.material.opacity = 0.2 + Math.sin(time * 2) * 0.1;
+                }
+
+                // Animate floating particles around ghost
+                if (ghost.userData.particleGroup) {
+                    ghost.userData.particleGroup.children.forEach((particle, pIndex) => {
+                        const pTime = time * particle.userData.speed;
+                        const angle = particle.userData.angle + pTime;
+                        const radius = particle.userData.radius;
+                        const yOff = particle.userData.yOffset;
+
+                        particle.position.x = Math.cos(angle) * radius;
+                        particle.position.z = Math.sin(angle) * radius;
+                        particle.position.y = -0.2 + Math.sin(pTime * 2 + pIndex) * 0.3 - yOff;
+
+                        // Fade in/out
+                        particle.material.opacity = 0.3 + Math.sin(pTime * 3 + pIndex) * 0.3;
+                        particle.scale.setScalar(0.5 + Math.sin(pTime * 2) * 0.3);
+                    });
+                }
+
+                // Flicker ghost light
+                if (ghost.userData.ghostLight) {
+                    ghost.userData.ghostLight.intensity = 0.4 + Math.sin(time * 4 + ghost.userData.phaseOffset) * 0.2;
+                }
             });
 
             // Flickering torch light effect

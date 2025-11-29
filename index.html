@@ -2047,6 +2047,11 @@
             if (e.key === '2') setCameraMode(2);
             if (e.key === '3') setCameraMode(3);
 
+            // Cheat: Press Y to skip to next stage
+            if (e.key.toLowerCase() === 'y' && gameRunning) {
+                nextStage();
+            }
+
             // Keyboard camera controls (Q/E for horizontal, R/F for vertical)
             if (cameraMode === 2) {
                 // Third-person mode - orbit camera (inverted for natural feel)

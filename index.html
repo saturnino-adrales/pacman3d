@@ -1465,6 +1465,11 @@
             pacmanPos = { x: 1, z: 1 };
             pacmanDir = { x: 1, z: 0 };
             nextDir = { x: 1, z: 0 };
+            pacman.position.set(
+                pacmanPos.x * CELL_SIZE + CELL_SIZE / 2,
+                GROUND_Y,
+                pacmanPos.z * CELL_SIZE + CELL_SIZE / 2
+            );
 
             // Play stage clear sound
             playStageComplete();

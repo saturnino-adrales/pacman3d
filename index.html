@@ -151,6 +151,10 @@
         <br>
         <button id="restartBtn" onclick="restartGame()">Play Again</button>
     </div>
+    <div id="stageCleared" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #00ff00; font-size: 48px; text-align: center; z-index: 200; display: none; text-shadow: 4px 4px 8px #000;">
+        <div id="stageClearedText">Stage 1 Cleared!</div>
+        <div id="extraLifeText" style="font-size: 32px; color: #ffff00; margin-top: 15px; display: none;">+1 UP!</div>
+    </div>
     <div id="startScreen">
         <div style="font-size: 64px; color: #ffff00; text-shadow: 4px 4px 8px #000;">PAC-MAN 3D</div>
         <div style="font-size: 24px; margin-top: 30px; animation: blink 1s infinite;">Click or Press Any Key to Start</div>
@@ -1729,57 +1733,127 @@
             document.getElementById('gameOver').style.display = 'block';
         }
 
+        // Ghost spawn positions from maze (where maze[z][x] === 4)
+        const ghostSpawnPositions = [
+            { x: 9, z: 7 },   // First ghost spawn
+            { x: 8, z: 9 },   // Second ghost spawn
+            { x: 9, z: 9 },   // Third ghost spawn
+            { x: 10, z: 9 }   // Fourth ghost spawn
+        ];
+
         // Advance to next stage
         function nextStage() {
-            if (currentStage >= MAX_STAGE) {
-                // Beat all stages - you win!
-                gameRunning = false;
-                document.getElementById('gameWin').style.display = 'block';
-                return;
+            // Pause the game
+            gameRunning = false;
+
+            // Show stage cleared message
+            const clearedStage = currentStage;
+            const stageClearedDiv = document.getElementById('stageCleared');
+            const stageClearedText = document.getElementById('stageClearedText');
+            const extraLifeText = document.getElementById('extraLifeText');
+
+            stageClearedText.textContent = `Stage ${clearedStage} Cleared!`;
+            stageClearedDiv.style.display = 'block';
+
+            // Check for 1-up at stages 3, 6, 9
+            const isExtraLifeStage = (clearedStage === 3 || clearedStage === 6 || clearedStage === 9);
+            if (isExtraLifeStage) {
+                lives++;
+                extraLifeText.style.display = 'block';
+                updateUI();
+            } else {
+                extraLifeText.style.display = 'none';
             }
-
-            currentStage++;
-
-            // Change wall color for new stage
-            const newColor = stageColors[currentStage - 1];
-            wallMaterial.color.setHex(newColor);
-
-            // Reset dots
-            dots.forEach(dot => scene.remove(dot));
-            dots.length = 0;
-            collectedDots = 0;
-            totalDots = 0;
-            createDots();
-
-            // Reset ghost positions
-            const ghostColors = [0xff0000, 0x00ffff, 0xff69b4, 0xffa500];
-            ghosts.forEach((ghost, index) => {
-                ghost.userData.gridX = 9 + (index % 2);
-                ghost.userData.gridZ = 9 + Math.floor(index / 2);
-                ghost.position.set(
-                    ghost.userData.gridX * CELL_SIZE + CELL_SIZE / 2,
-                    0.8,
-                    ghost.userData.gridZ * CELL_SIZE + CELL_SIZE / 2
-                );
-                ghost.userData.scared = false;
-                ghost.children[0].material.color.setHex(ghostColors[index]);
-                ghost.children[0].material.emissive.setHex(ghostColors[index] * 0.3);
-            });
-
-            // Reset Pac-Man position
-            pacmanPos = { x: 1, z: 1 };
-            pacmanDir = { x: 1, z: 0 };
-            nextDir = { x: 1, z: 0 };
-            pacman.position.set(
-                pacmanPos.x * CELL_SIZE + CELL_SIZE / 2,
-                GROUND_Y,
-                pacmanPos.z * CELL_SIZE + CELL_SIZE / 2
-            );
 
             // Play stage clear sound
             playStageComplete();
 
-            updateUI();
+            // After 2 seconds, proceed to next stage or show win screen
+            setTimeout(() => {
+                stageClearedDiv.style.display = 'none';
+                extraLifeText.style.display = 'none';
+
+                if (currentStage >= MAX_STAGE) {
+                    // Beat all stages - you win!
+                    document.getElementById('gameWin').style.display = 'block';
+                    return;
+                }
+
+                currentStage++;
+
+                // Change wall color for new stage
+                const newColor = stageColors[currentStage - 1];
+                wallMaterial.color.setHex(newColor);
+
+                // Reset dots
+                dots.forEach(dot => scene.remove(dot));
+                dots.length = 0;
+                collectedDots = 0;
+                totalDots = 0;
+                createDots();
+
+                // Reset ghost positions to their original spawn points
+                ghosts.forEach((ghost, index) => {
+                    const spawnPos = ghostSpawnPositions[index % ghostSpawnPositions.length];
+                    ghost.userData.gridX = spawnPos.x;
+                    ghost.userData.gridZ = spawnPos.z;
+                    ghost.userData.dir = { x: 0, z: -1 };
+                    ghost.position.set(
+                        ghost.userData.gridX * CELL_SIZE + CELL_SIZE / 2,
+                        0,
+                        ghost.userData.gridZ * CELL_SIZE + CELL_SIZE / 2
+                    );
+                    ghost.userData.scared = false;
+
+                    // Restore shader to normal state
+                    if (ghost.userData.ghostMaterial) {
+                        ghost.userData.ghostMaterial.uniforms.isScared.value = false;
+                        ghost.userData.ghostMaterial.uniforms.glowColor.value.setHex(ghost.userData.originalColor);
+                    }
+
+                    // Restore core color
+                    if (ghost.userData.coreMesh) {
+                        ghost.userData.coreMesh.material.color.setHex(ghost.userData.originalColor);
+                    }
+
+                    // Restore particles color
+                    if (ghost.userData.particleGroup) {
+                        ghost.userData.particleGroup.children.forEach(p => {
+                            p.material.color.setHex(ghost.userData.originalColor);
+                        });
+                    }
+
+                    // Restore ghost light color
+                    if (ghost.userData.ghostLight) {
+                        ghost.userData.ghostLight.color.setHex(ghost.userData.originalColor);
+                    }
+                });
+
+                // Reset Pac-Man to starting position (9, 15)
+                pacmanPos = { x: 9, z: 15 };
+                pacmanDir = { x: 0, z: 0 };
+                nextDir = { x: 0, z: 0 };
+                pacmanY = GROUND_Y;
+                isJumping = false;
+                jumpVelocity = 0;
+                pacman.position.set(
+                    pacmanPos.x * CELL_SIZE + CELL_SIZE / 2,
+                    GROUND_Y,
+                    pacmanPos.z * CELL_SIZE + CELL_SIZE / 2
+                );
+
+                // Clear power mode if active
+                if (powerTimer) {
+                    clearTimeout(powerTimer);
+                    powerTimer = null;
+                }
+                powerMode = false;
+
+                updateUI();
+
+                // Resume the game
+                gameRunning = true;
+            }, 2000);
         }
 
         // Play stage complete sound

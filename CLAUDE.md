@@ -44,3 +44,4 @@ POWER_DURATION = 8000 // Power pellet effect (ms)
 - WASD or Arrow Keys for movement
 - Direction changes queue until valid (no immediate wall collision)
 - when i say release, it means to update the gihub page of pacman3D
+- remember to push and release every time we update the code

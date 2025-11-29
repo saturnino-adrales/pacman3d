@@ -158,8 +158,8 @@
     <!-- Portrait orientation warning -->
     <div id="portraitWarning">
         <div class="rotate-icon">📱</div>
-        <div style="font-size: 32px; font-weight: bold;">Rotate Your Device</div>
-        <div style="font-size: 18px; margin-top: 15px; color: #aaa;">This game is best played in landscape mode</div>
+        <div style="font-size: 32px; font-weight: bold;">Rotate to Landscape</div>
+        <div style="font-size: 16px; margin-top: 15px; color: #aaa;">Then tap to start - screen will lock in landscape</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1894,24 +1894,55 @@
         }
 
         // Lock screen orientation to landscape
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
         function lockOrientation() {
             if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('landscape').catch((err) => {
-                    console.log('Orientation lock not supported:', err.message);
-                });
+                screen.orientation.lock('landscape').catch(() => {});
             }
         }
 
-        // Try to lock orientation on fullscreen or user interaction
-        document.addEventListener('click', () => {
-            lockOrientation();
-            // Also request fullscreen on mobile for better experience
-            if (document.documentElement.requestFullscreen && /Mobi|Android/i.test(navigator.userAgent)) {
-                document.documentElement.requestFullscreen().catch(() => {});
+        function enterFullscreenAndLock() {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen()
+                    .then(() => lockOrientation())
+                    .catch(() => {});
+            } else if (document.fullscreenElement) {
+                lockOrientation();
             }
-        }, { once: true });
+        }
 
-        // Lock orientation when entering fullscreen
+        // On mobile: aggressively request fullscreen + lock on any interaction
+        if (isMobile) {
+            // Request on start screen click
+            const startScreen = document.getElementById('startScreen');
+            if (startScreen) {
+                startScreen.addEventListener('click', enterFullscreenAndLock);
+            }
+
+            // Re-request if user exits fullscreen while playing
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement && gameRunning) {
+                    // Show a tap-to-fullscreen prompt briefly
+                    setTimeout(() => {
+                        if (!document.fullscreenElement && gameRunning) {
+                            document.body.addEventListener('click', enterFullscreenAndLock, { once: true });
+                        }
+                    }, 500);
+                } else if (document.fullscreenElement) {
+                    lockOrientation();
+                }
+            });
+
+            // Also lock on orientation change attempts
+            window.addEventListener('orientationchange', () => {
+                if (document.fullscreenElement) {
+                    lockOrientation();
+                }
+            });
+        }
+
+        // Desktop: just lock on fullscreen
         document.addEventListener('fullscreenchange', () => {
             if (document.fullscreenElement) {
                 lockOrientation();

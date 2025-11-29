@@ -1701,12 +1701,12 @@
                     cameraPitchAngle = Math.max(CAMERA_PITCH_MIN, Math.min(CAMERA_PITCH_MAX, cameraPitchAngle));
                 }
             } else if (cameraMode === 3) {
-                // FPS mode - Resident Evil style free look
+                // FPS mode - right stick for looking around
                 if (Math.abs(rightStickX) > STICK_DEADZONE) {
-                    fpsYawAngle += rightStickX * FPS_LOOK_SPEED;
+                    fpsYawAngle += rightStickX * FPS_LOOK_SPEED * 2; // 2x for responsive feel
                 }
                 if (Math.abs(rightStickY) > STICK_DEADZONE) {
-                    fpsPitchAngle -= rightStickY * FPS_LOOK_SPEED; // Inverted for natural feel
+                    fpsPitchAngle -= rightStickY * FPS_LOOK_SPEED * 2; // Inverted for natural feel
                     fpsPitchAngle = Math.max(FPS_PITCH_MIN, Math.min(FPS_PITCH_MAX, fpsPitchAngle));
                 }
             }

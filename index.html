@@ -170,9 +170,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         // Game constants
-        const CELL_SIZE = 2;
-        const PACMAN_SPEED = 0.08;
-        const BASE_GHOST_SPEED = 0.035;
+        const CELL_SIZE = 6;  // 3x larger world (was 2)
+        const SCALE_FACTOR = 3;  // For scaling entities
+        const PACMAN_SPEED = 0.24;  // 3x speed to match larger world
+        const BASE_GHOST_SPEED = 0.105;  // 3x speed to match larger world
         const POWER_DURATION = 8000;
         const MAX_STAGE = 10;
 
@@ -400,9 +401,9 @@
         // Camera modes: 1 = Classic (top-down), 2 = Third-person, 3 = FPS
         let cameraMode = 2; // Default to 3rd person view
         const cameraModes = {
-            1: { name: 'Classic', offsetY: 40, offsetZ: 10, lookY: 0, fov: 60 },
-            2: { name: '3rd Person', offsetY: 8, offsetZ: 12, lookAhead: 5, fov: 70 },
-            3: { name: 'FPS', eyeHeight: 1.2, lookDistance: 10, fov: 90 }
+            1: { name: 'Classic', offsetY: 40 * SCALE_FACTOR, offsetZ: 10 * SCALE_FACTOR, lookY: 0, fov: 60 },
+            2: { name: '3rd Person', offsetY: 8 * SCALE_FACTOR, offsetZ: 12 * SCALE_FACTOR, lookAhead: 5 * SCALE_FACTOR, fov: 70 },
+            3: { name: 'FPS', eyeHeight: 1.2 * SCALE_FACTOR, lookDistance: 10 * SCALE_FACTOR, fov: 90 }
         };
 
         // Camera orbit angle for 3rd person mode (controlled by right stick)
@@ -451,13 +452,13 @@
         // Three.js setup
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a2e);
-        scene.fog = new THREE.Fog(0x1a1a2e, 20, 80);
+        scene.fog = new THREE.Fog(0x1a1a2e, 20 * SCALE_FACTOR, 80 * SCALE_FACTOR);
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000 * SCALE_FACTOR);
         // Initialize camera for Classic mode (top-down view)
         const startX = 9 * CELL_SIZE + CELL_SIZE / 2;
         const startZ = 15 * CELL_SIZE + CELL_SIZE / 2;
-        let cameraTargetPos = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 40, MAZE_HEIGHT * CELL_SIZE + 10);
+        let cameraTargetPos = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 40 * SCALE_FACTOR, MAZE_HEIGHT * CELL_SIZE + 10 * SCALE_FACTOR);
         let cameraTargetLook = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 0, MAZE_HEIGHT * CELL_SIZE / 2);
         camera.position.copy(cameraTargetPos);
         camera.lookAt(cameraTargetLook);
@@ -524,7 +525,7 @@
 
         // Main light from above (like a hole in cave ceiling)
         const directionalLight = new THREE.DirectionalLight(0xffffee, 1.0);
-        directionalLight.position.set(20, 50, 10);
+        directionalLight.position.set(20 * SCALE_FACTOR, 50 * SCALE_FACTOR, 10 * SCALE_FACTOR);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
@@ -532,21 +533,21 @@
 
         // Second directional light to illuminate far end
         const directionalLight2 = new THREE.DirectionalLight(0xeeeeff, 0.6);
-        directionalLight2.position.set(20, 40, -20);
+        directionalLight2.position.set(20 * SCALE_FACTOR, 40 * SCALE_FACTOR, -20 * SCALE_FACTOR);
         scene.add(directionalLight2);
 
         // Add some point lights for cave glow effect
-        const caveLight1 = new THREE.PointLight(0x6666ff, 0.8, 50);
-        caveLight1.position.set(5, 8, 5);
+        const caveLight1 = new THREE.PointLight(0x6666ff, 0.8, 50 * SCALE_FACTOR);
+        caveLight1.position.set(5 * SCALE_FACTOR, 8 * SCALE_FACTOR, 5 * SCALE_FACTOR);
         scene.add(caveLight1);
 
-        const caveLight2 = new THREE.PointLight(0x6666ff, 0.8, 50);
-        caveLight2.position.set(MAZE_WIDTH * CELL_SIZE - 5, 8, 5);
+        const caveLight2 = new THREE.PointLight(0x6666ff, 0.8, 50 * SCALE_FACTOR);
+        caveLight2.position.set(MAZE_WIDTH * CELL_SIZE - 5 * SCALE_FACTOR, 8 * SCALE_FACTOR, 5 * SCALE_FACTOR);
         scene.add(caveLight2);
 
         // Add a warm light near center (like torches)
-        const torchLight = new THREE.PointLight(0xff6600, 0.6, 35);
-        torchLight.position.set(MAZE_WIDTH * CELL_SIZE / 2, 5, MAZE_HEIGHT * CELL_SIZE / 2);
+        const torchLight = new THREE.PointLight(0xff6600, 0.6, 35 * SCALE_FACTOR);
+        torchLight.position.set(MAZE_WIDTH * CELL_SIZE / 2, 5 * SCALE_FACTOR, MAZE_HEIGHT * CELL_SIZE / 2);
         scene.add(torchLight);
 
         // Corner torches array for animation
@@ -557,36 +558,36 @@
             const torchGroup = new THREE.Group();
 
             // Torch handle (wooden stick)
-            const handleGeometry = new THREE.CylinderGeometry(0.08, 0.12, 1.5, 8);
+            const handleGeometry = new THREE.CylinderGeometry(0.08 * SCALE_FACTOR, 0.12 * SCALE_FACTOR, 1.5 * SCALE_FACTOR, 8);
             const handleMaterial = new THREE.MeshPhongMaterial({ color: 0x4a3728, emissive: 0x1a1008 });
             const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-            handle.position.y = 0.75;
+            handle.position.y = 0.75 * SCALE_FACTOR;
             torchGroup.add(handle);
 
             // Torch head (wrapped cloth)
-            const headGeometry = new THREE.CylinderGeometry(0.15, 0.1, 0.3, 8);
+            const headGeometry = new THREE.CylinderGeometry(0.15 * SCALE_FACTOR, 0.1 * SCALE_FACTOR, 0.3 * SCALE_FACTOR, 8);
             const headMaterial = new THREE.MeshPhongMaterial({ color: 0x2a2a2a, emissive: 0x111111 });
             const head = new THREE.Mesh(headGeometry, headMaterial);
-            head.position.y = 1.6;
+            head.position.y = 1.6 * SCALE_FACTOR;
             torchGroup.add(head);
 
             // Flame (multiple layers for effect)
-            const flameGeometry = new THREE.ConeGeometry(0.2, 0.5, 8);
+            const flameGeometry = new THREE.ConeGeometry(0.2 * SCALE_FACTOR, 0.5 * SCALE_FACTOR, 8);
             const flameMaterial = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.9 });
             const flame = new THREE.Mesh(flameGeometry, flameMaterial);
-            flame.position.y = 2.0;
+            flame.position.y = 2.0 * SCALE_FACTOR;
             torchGroup.add(flame);
 
             // Inner flame (brighter)
-            const innerFlameGeometry = new THREE.ConeGeometry(0.1, 0.35, 8);
+            const innerFlameGeometry = new THREE.ConeGeometry(0.1 * SCALE_FACTOR, 0.35 * SCALE_FACTOR, 8);
             const innerFlameMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.8 });
             const innerFlame = new THREE.Mesh(innerFlameGeometry, innerFlameMaterial);
-            innerFlame.position.y = 1.95;
+            innerFlame.position.y = 1.95 * SCALE_FACTOR;
             torchGroup.add(innerFlame);
 
             // Point light for the torch
-            const light = new THREE.PointLight(0xff8833, 1.5, 40);
-            light.position.y = 2.5;
+            const light = new THREE.PointLight(0xff8833, 1.5, 40 * SCALE_FACTOR);
+            light.position.y = 2.5 * SCALE_FACTOR;
             torchGroup.add(light);
 
             torchGroup.position.set(x, 0, z);
@@ -597,10 +598,10 @@
 
         // Add torches to all four corners
         const torchPositions = [
-            { x: 2, z: 2 },                                    // Top-left
-            { x: MAZE_WIDTH * CELL_SIZE - 2, z: 2 },           // Top-right
-            { x: 2, z: MAZE_HEIGHT * CELL_SIZE - 2 },          // Bottom-left
-            { x: MAZE_WIDTH * CELL_SIZE - 2, z: MAZE_HEIGHT * CELL_SIZE - 2 }  // Bottom-right
+            { x: 2 * SCALE_FACTOR, z: 2 * SCALE_FACTOR },                                    // Top-left
+            { x: MAZE_WIDTH * CELL_SIZE - 2 * SCALE_FACTOR, z: 2 * SCALE_FACTOR },           // Top-right
+            { x: 2 * SCALE_FACTOR, z: MAZE_HEIGHT * CELL_SIZE - 2 * SCALE_FACTOR },          // Bottom-left
+            { x: MAZE_WIDTH * CELL_SIZE - 2 * SCALE_FACTOR, z: MAZE_HEIGHT * CELL_SIZE - 2 * SCALE_FACTOR }  // Bottom-right
         ];
 
         torchPositions.forEach(pos => {
@@ -892,17 +893,17 @@
         // Jump state
         let isJumping = false;
         let jumpVelocity = 0;
-        let pacmanY = 0.8; // Base Y position
-        const JUMP_FORCE = 0.35;
-        const GRAVITY = 0.015;
-        const GROUND_Y = 0.8;
+        let pacmanY = 0.8 * SCALE_FACTOR; // Base Y position
+        const JUMP_FORCE = 0.35 * SCALE_FACTOR;
+        const GRAVITY = 0.015 * SCALE_FACTOR;
+        const GROUND_Y = 0.8 * SCALE_FACTOR;
 
         // Create floor
         function createFloor() {
-            const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE + 4, MAZE_HEIGHT * CELL_SIZE + 4);
+            const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE + 4 * SCALE_FACTOR, MAZE_HEIGHT * CELL_SIZE + 4 * SCALE_FACTOR);
             const floor = new THREE.Mesh(floorGeometry, floorMaterial);
             floor.rotation.x = -Math.PI / 2;
-            floor.position.set(MAZE_WIDTH * CELL_SIZE / 2, -0.5, MAZE_HEIGHT * CELL_SIZE / 2);
+            floor.position.set(MAZE_WIDTH * CELL_SIZE / 2, -0.5 * SCALE_FACTOR, MAZE_HEIGHT * CELL_SIZE / 2);
             floor.receiveShadow = true;
             scene.add(floor);
         }
@@ -910,7 +911,7 @@
         // Create starfield sky dome
         function createStarfield() {
             // Create a large dome above the scene with stars
-            const skyGeometry = new THREE.SphereGeometry(200, 32, 32);
+            const skyGeometry = new THREE.SphereGeometry(200 * SCALE_FACTOR, 32, 32);
 
             // Create starfield texture
             const starCanvas = document.createElement('canvas');
@@ -1007,17 +1008,17 @@
             for (let z = 0; z < MAZE_HEIGHT; z++) {
                 for (let x = 0; x < MAZE_WIDTH; x++) {
                     if (maze[z][x] === 2) {
-                        const dotGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+                        const dotGeometry = new THREE.SphereGeometry(0.15 * SCALE_FACTOR, 8, 8);
                         const dot = new THREE.Mesh(dotGeometry, dotMaterial);
-                        dot.position.set(x * CELL_SIZE + CELL_SIZE / 2, 0.5, z * CELL_SIZE + CELL_SIZE / 2);
+                        dot.position.set(x * CELL_SIZE + CELL_SIZE / 2, 0.5 * SCALE_FACTOR, z * CELL_SIZE + CELL_SIZE / 2);
                         dot.userData = { gridX: x, gridZ: z, type: 'dot' };
                         scene.add(dot);
                         dots.push(dot);
                         totalDots++;
                     } else if (maze[z][x] === 3) {
-                        const powerGeometry = new THREE.SphereGeometry(0.4, 16, 16);
+                        const powerGeometry = new THREE.SphereGeometry(0.4 * SCALE_FACTOR, 16, 16);
                         const power = new THREE.Mesh(powerGeometry, powerMaterial);
-                        power.position.set(x * CELL_SIZE + CELL_SIZE / 2, 0.5, z * CELL_SIZE + CELL_SIZE / 2);
+                        power.position.set(x * CELL_SIZE + CELL_SIZE / 2, 0.5 * SCALE_FACTOR, z * CELL_SIZE + CELL_SIZE / 2);
                         power.userData = { gridX: x, gridZ: z, type: 'power' };
                         scene.add(power);
                         dots.push(power);
@@ -1131,9 +1132,12 @@
             pacman.userData.body = body;
             pacman.userData.walkCycle = 0;
 
+            // Scale entire Pac-Man for larger world
+            pacman.scale.setScalar(SCALE_FACTOR);
+
             pacman.position.set(
                 pacmanPos.x * CELL_SIZE + CELL_SIZE / 2,
-                0.8,
+                0.8 * SCALE_FACTOR,
                 pacmanPos.z * CELL_SIZE + CELL_SIZE / 2
             );
 
@@ -1312,9 +1316,12 @@
                 ghostGroup.add(rightPupil);
 
                 // Point light for ethereal glow
-                const ghostLight = new THREE.PointLight(ghostColor, 0.5, 8);
+                const ghostLight = new THREE.PointLight(ghostColor, 0.5, 8 * SCALE_FACTOR);
                 ghostLight.position.y = 0.5;
                 ghostGroup.add(ghostLight);
+
+                // Scale entire ghost for larger world
+                ghostGroup.scale.setScalar(SCALE_FACTOR);
 
                 ghostGroup.position.set(
                     spawn.x * CELL_SIZE + CELL_SIZE / 2,
@@ -1667,7 +1674,7 @@
         // Check ghost collision
         function checkGhostCollision(ghost) {
             // Skip collision if Pac-Man is jumping high enough
-            if (isJumping && pacmanY > GROUND_Y + 1.0) {
+            if (isJumping && pacmanY > GROUND_Y + 1.0 * SCALE_FACTOR) {
                 return; // Pac-Man is in the air, safe from ghosts
             }
 
@@ -2360,7 +2367,7 @@
 
                     // Always look at Pac-Man
                     const lookX = pacman.position.x;
-                    const lookY = 1.0 + (pacmanY - GROUND_Y);
+                    const lookY = 1.0 * SCALE_FACTOR + (pacmanY - GROUND_Y);
                     const lookZ = pacman.position.z;
 
                     cameraTargetLook.lerp(new THREE.Vector3(lookX, lookY, lookZ), 0.05);
@@ -2388,7 +2395,7 @@
 
             // Floating animation for dots
             dots.forEach((dot, index) => {
-                dot.position.y = 0.5 + Math.sin(Date.now() * 0.003 + index) * 0.1;
+                dot.position.y = 0.5 * SCALE_FACTOR + Math.sin(Date.now() * 0.003 + index) * 0.1 * SCALE_FACTOR;
                 dot.rotation.y += 0.02;
             });
 
@@ -2396,7 +2403,7 @@
             const time = Date.now() * 0.001;
             ghosts.forEach((ghost, index) => {
                 // Floating motion
-                ghost.position.y = Math.sin(time * 2 + ghost.userData.phaseOffset) * 0.15;
+                ghost.position.y = Math.sin(time * 2 + ghost.userData.phaseOffset) * 0.15 * SCALE_FACTOR;
 
                 // Update shader time uniform for wavering effect
                 if (ghost.userData.ghostMaterial) {

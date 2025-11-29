@@ -2252,6 +2252,13 @@
             }
             prevGamepadButtons.a = aButton;
 
+            // Y button (index 3) for cheat - skip to next stage
+            const yButton = gamepad.buttons[3]?.pressed;
+            if (yButton && !prevGamepadButtons.y && gameRunning) {
+                nextStage();
+            }
+            prevGamepadButtons.y = yButton;
+
             // LB + RB (buttons 4 and 5) together - cycle camera mode
             const lbButton = gamepad.buttons[4]?.pressed;
             const rbButton = gamepad.buttons[5]?.pressed;

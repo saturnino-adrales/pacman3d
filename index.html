@@ -400,7 +400,7 @@
         // Camera modes: 1 = Classic (top-down), 2 = Third-person, 3 = FPS
         let cameraMode = 2; // Default to 3rd person view
         const cameraModes = {
-            1: { name: 'Classic', offsetY: 40, offsetZ: 10, lookY: 0, fov: 60 },
+            1: { name: 'Classic', offsetY: 80, offsetZ: 20, lookY: 0, fov: 60 },  // Higher for 2x larger maze
             2: { name: '3rd Person', offsetY: 8, offsetZ: 12, lookAhead: 5, fov: 70 },
             3: { name: 'FPS', eyeHeight: 1.2, lookDistance: 10, fov: 90 }
         };
@@ -420,29 +420,52 @@
         const FPS_PITCH_MIN = -0.6;  // Limit looking down
         const FPS_PITCH_MAX = 0.5;   // Limit looking up
 
-        // Maze layout (1 = wall, 0 = path, 2 = dot, 3 = power pellet, 4 = ghost spawn)
+        // Maze layout - EXPANDED 2x for wider corridors (1 = wall, 0 = path, 2 = dot, 3 = power pellet, 4 = ghost spawn)
+        // Original 19x21 expanded to 37x41 with 2-wide paths
+        // Dots placed only on even rows/cols to avoid doubling collectibles
         const maze = [
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
-            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-            [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
-            [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-            [1,1,1,1,2,1,1,1,0,1,0,1,1,1,2,1,1,1,1],
-            [0,0,0,1,2,1,0,0,0,4,0,0,0,1,2,1,0,0,0],
-            [1,1,1,1,2,1,0,1,1,0,1,1,0,1,2,1,1,1,1],
-            [0,0,0,0,2,0,0,1,4,4,4,1,0,0,2,0,0,0,0],
-            [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
-            [0,0,0,1,2,1,0,0,0,0,0,0,0,1,2,1,0,0,0],
-            [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
-            [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
-            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-            [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
-            [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
-            [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-            [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
-            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,3,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,1,1,2,0,2,0,2,0,2,0,2,0,2,0,2,0,0,3,1,1],
+            [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+            [1,1,2,0,1,1,1,1,2,0,1,1,1,1,1,1,2,0,1,1,2,0,1,1,1,1,1,1,2,0,1,1,1,1,2,0,1,1],
+            [1,1,0,0,1,1,1,1,0,0,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,0,0,1,1,1,1,0,0,1,1],
+            [1,1,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,1,1],
+            [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+            [1,1,2,0,1,1,1,1,2,0,1,1,2,0,1,1,1,1,1,1,1,1,1,1,2,0,1,1,2,0,1,1,1,1,2,0,1,1],
+            [1,1,0,0,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,0,0,1,1],
+            [1,1,2,0,2,0,2,0,2,0,1,1,2,0,2,0,2,0,1,1,2,0,2,0,2,0,1,1,2,0,2,0,2,0,2,0,1,1],
+            [1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1],
+            [1,1,1,1,1,1,1,1,2,0,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,2,0,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1],
+            [0,0,0,0,0,0,1,1,2,0,1,1,0,0,0,0,0,0,4,0,0,0,0,0,0,0,1,1,2,0,1,1,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,4,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+            [1,1,1,1,1,1,1,1,2,0,1,1,0,0,1,1,1,1,0,0,1,1,1,1,0,0,1,1,2,0,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,0,0,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1],
+            [0,0,0,0,0,0,0,0,2,0,0,0,0,0,1,1,4,0,0,0,0,0,1,1,0,0,0,0,2,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,4,4,4,4,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [1,1,1,1,1,1,1,1,2,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,2,0,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1],
+            [0,0,0,0,0,0,1,1,2,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,0,1,1,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0],
+            [1,1,1,1,1,1,1,1,2,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,2,0,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1],
+            [1,1,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,1,1,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,1,1],
+            [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+            [1,1,2,0,1,1,1,1,2,0,1,1,1,1,1,1,2,0,1,1,2,0,1,1,1,1,1,1,2,0,1,1,1,1,2,0,1,1],
+            [1,1,0,0,1,1,1,1,0,0,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,0,0,1,1,1,1,0,0,1,1],
+            [1,1,3,0,2,0,1,1,2,0,2,0,2,0,2,0,2,0,0,0,2,0,2,0,2,0,2,0,2,0,1,1,2,0,0,3,1,1],
+            [1,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,1],
+            [1,1,1,1,2,0,1,1,2,0,1,1,2,0,1,1,1,1,1,1,1,1,1,1,2,0,1,1,2,0,1,1,2,0,1,1,1,1],
+            [1,1,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1,1],
+            [1,1,2,0,2,0,2,0,2,0,1,1,2,0,2,0,2,0,1,1,2,0,2,0,2,0,1,1,2,0,2,0,2,0,2,0,1,1],
+            [1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1],
+            [1,1,2,0,1,1,1,1,1,1,1,1,1,1,1,1,2,0,1,1,2,0,1,1,1,1,1,1,1,1,1,1,1,1,2,0,1,1],
+            [1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1],
+            [1,1,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,2,0,1,1],
+            [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
         ];
 
         const MAZE_HEIGHT = maze.length;
@@ -451,13 +474,13 @@
         // Three.js setup
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a2e);
-        scene.fog = new THREE.Fog(0x1a1a2e, 20, 80);
+        scene.fog = new THREE.Fog(0x1a1a2e, 40, 160);  // Extended for 2x larger maze
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         // Initialize camera for Classic mode (top-down view)
-        const startX = 9 * CELL_SIZE + CELL_SIZE / 2;
-        const startZ = 15 * CELL_SIZE + CELL_SIZE / 2;
-        let cameraTargetPos = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 40, MAZE_HEIGHT * CELL_SIZE + 10);
+        const startX = 18 * CELL_SIZE + CELL_SIZE / 2;  // 2x expanded maze position
+        const startZ = 30 * CELL_SIZE + CELL_SIZE / 2;  // 2x expanded maze position
+        let cameraTargetPos = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 80, MAZE_HEIGHT * CELL_SIZE + 20);  // Higher for 2x larger maze
         let cameraTargetLook = new THREE.Vector3(MAZE_WIDTH * CELL_SIZE / 2, 0, MAZE_HEIGHT * CELL_SIZE / 2);
         camera.position.copy(cameraTargetPos);
         camera.lookAt(cameraTargetLook);
@@ -468,16 +491,16 @@
             camera.fov = cameraModes[mode].fov;
             camera.updateProjectionMatrix();
 
-            // Update fog based on mode
+            // Update fog based on mode (extended for 2x larger maze)
             if (mode === 1) {
-                scene.fog.near = 20;
-                scene.fog.far = 80;
+                scene.fog.near = 40;
+                scene.fog.far = 160;
             } else if (mode === 2) {
-                scene.fog.near = 15;
-                scene.fog.far = 60;
+                scene.fog.near = 30;
+                scene.fog.far = 120;
             } else {
-                scene.fog.near = 5;
-                scene.fog.far = 40;
+                scene.fog.near = 10;
+                scene.fog.far = 80;
             }
 
             // Show/hide Pac-Man based on mode
@@ -883,7 +906,7 @@
         let walls = [];
 
         // Pacman state
-        let pacmanPos = { x: 9, z: 15 };
+        let pacmanPos = { x: 18, z: 30 };  // 2x expanded maze position
         let pacmanDir = { x: 0, z: 0 };
         let nextDir = { x: 0, z: 0 };
         let mouthOpen = 0;
@@ -1725,13 +1748,15 @@
                 gameOver();
             } else {
                 // Reset positions
-                pacmanPos = { x: 9, z: 15 };
+                pacmanPos = { x: 18, z: 30 };  // 2x expanded maze position
                 pacmanDir = { x: 0, z: 0 };
                 nextDir = { x: 0, z: 0 };
 
                 ghosts.forEach((ghost, index) => {
-                    ghost.userData.gridX = 8 + (index % 3);
-                    ghost.userData.gridZ = 9;
+                    // Use ghostSpawnPositions for 2x expanded maze
+                    const spawnPos = ghostSpawnPositions[index % ghostSpawnPositions.length];
+                    ghost.userData.gridX = spawnPos.x;
+                    ghost.userData.gridZ = spawnPos.z;
                     ghost.userData.dir = { x: 0, z: -1 };
                 });
             }
@@ -1744,11 +1769,12 @@
         }
 
         // Ghost spawn positions from maze (where maze[z][x] === 4)
+        // Ghost spawn positions - 2x expanded maze (original positions * 2)
         const ghostSpawnPositions = [
-            { x: 9, z: 7 },   // First ghost spawn
-            { x: 8, z: 9 },   // Second ghost spawn
-            { x: 9, z: 9 },   // Third ghost spawn
-            { x: 10, z: 9 }   // Fourth ghost spawn
+            { x: 18, z: 14 },   // First ghost spawn (was 9, 7)
+            { x: 16, z: 18 },   // Second ghost spawn (was 8, 9)
+            { x: 18, z: 18 },   // Third ghost spawn (was 9, 9)
+            { x: 20, z: 18 }    // Fourth ghost spawn (was 10, 9)
         ];
 
         // Advance to next stage
@@ -1839,8 +1865,8 @@
                     }
                 });
 
-                // Reset Pac-Man to starting position (9, 15)
-                pacmanPos = { x: 9, z: 15 };
+                // Reset Pac-Man to starting position (18, 30) - 2x expanded maze
+                pacmanPos = { x: 18, z: 30 };
                 pacmanDir = { x: 0, z: 0 };
                 nextDir = { x: 0, z: 0 };
                 pacmanY = GROUND_Y;

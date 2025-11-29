@@ -194,6 +194,7 @@
 
         // Audio context for music
         let audioCtx = null;
+        let audioUnlocked = false;
 
         // Initialize audio context (must be triggered by user interaction)
         function initAudio() {
@@ -201,6 +202,36 @@
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
             return audioCtx;
+        }
+
+        // Unlock audio for iOS/Safari - must be called from user gesture
+        function unlockAudio() {
+            if (audioUnlocked) return Promise.resolve();
+
+            initAudio();
+
+            // iOS Safari requires resume() to be called from a user gesture
+            if (audioCtx.state === 'suspended') {
+                return audioCtx.resume().then(() => {
+                    audioUnlocked = true;
+                    console.log('Audio unlocked successfully');
+
+                    // Play a silent buffer to fully unlock on iOS
+                    const silentBuffer = audioCtx.createBuffer(1, 1, 22050);
+                    const source = audioCtx.createBufferSource();
+                    source.buffer = silentBuffer;
+                    source.connect(audioCtx.destination);
+                    source.start(0);
+
+                    return true;
+                }).catch(err => {
+                    console.warn('Audio unlock failed:', err);
+                    return false;
+                });
+            }
+
+            audioUnlocked = true;
+            return Promise.resolve(true);
         }
 
         // Play a note with oscillator (MIDI-style chiptune)
@@ -297,7 +328,7 @@
 
         // Waka waka sound effect for eating dots
         function playWaka() {
-            if (!audioCtx) return;
+            if (!audioCtx || audioCtx.state === 'suspended') return;
             const ctx = audioCtx;
             const now = ctx.currentTime;
 
@@ -320,7 +351,7 @@
 
         // Jump sound effect
         function playJumpSound() {
-            if (!audioCtx) return;
+            if (!audioCtx || audioCtx.state === 'suspended') return;
             const ctx = audioCtx;
             const now = ctx.currentTime;
 
@@ -1753,7 +1784,7 @@
 
         // Play stage complete sound
         function playStageComplete() {
-            if (!audioCtx) return;
+            if (!audioCtx || audioCtx.state === 'suspended') return;
             const ctx = audioCtx;
             const now = ctx.currentTime;
 
@@ -2157,10 +2188,13 @@
 
             // Setup start screen listeners
             const startScreen = document.getElementById('startScreen');
-            const startGame = () => {
+            const startGame = async () => {
                 if (gameStarted) return;
                 gameStarted = true;
                 startScreen.style.display = 'none';
+
+                // Unlock audio first (required for iOS/Safari PWA)
+                await unlockAudio();
 
                 // Play intro music
                 playPacmanIntro();
@@ -2172,6 +2206,7 @@
             };
 
             startScreen.addEventListener('click', startGame);
+            startScreen.addEventListener('touchend', startGame); // Better touch support for mobile
             document.addEventListener('keydown', (e) => {
                 if (!gameStarted) {
                     startGame();

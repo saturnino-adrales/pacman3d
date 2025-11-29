@@ -418,6 +418,22 @@
                 pacman.visible = (mode !== 3);
             }
 
+            // Handle mouse look for FPS mode
+            if (mode !== 3 && document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+            // Update instructions for FPS mode
+            const instructions = document.getElementById('instructions');
+            if (instructions) {
+                if (mode === 3) {
+                    instructions.innerHTML = 'WASD: move | Click to enable mouse look | SPACE: jump | 1/2/3: camera mode';
+                } else if (mode === 2) {
+                    instructions.innerHTML = 'WASD: move | Q/E: rotate camera | R/F: tilt | SPACE: jump | 1/2/3: camera mode';
+                } else {
+                    instructions.innerHTML = 'WASD/Arrows: move | SPACE: jump | 1/2/3: camera mode';
+                }
+            }
+
             updateModeDisplay();
         }
 
@@ -1532,6 +1548,42 @@
 
         document.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
+        });
+
+        // Mouse look for FPS mode (Pointer Lock API)
+        const MOUSE_SENSITIVITY = 0.002;
+        let isPointerLocked = false;
+
+        // Request pointer lock on click when in FPS mode
+        document.addEventListener('click', () => {
+            if (cameraMode === 3 && gameRunning && !isPointerLocked) {
+                document.body.requestPointerLock();
+            }
+        });
+
+        // Handle pointer lock state changes
+        document.addEventListener('pointerlockchange', () => {
+            isPointerLocked = document.pointerLockElement === document.body;
+            const instructions = document.getElementById('instructions');
+            if (instructions && cameraMode === 3) {
+                if (isPointerLocked) {
+                    instructions.innerHTML = 'WASD: move | MOUSE: look | SPACE: jump | ESC: release mouse | 1/2/3: camera mode';
+                } else {
+                    instructions.innerHTML = 'WASD: move | Click to enable mouse look | SPACE: jump | 1/2/3: camera mode';
+                }
+            }
+        });
+
+        // Mouse movement for FPS look
+        document.addEventListener('mousemove', (e) => {
+            if (!isPointerLocked || cameraMode !== 3) return;
+
+            // Horizontal mouse movement = yaw (left/right look)
+            fpsYawAngle += e.movementX * MOUSE_SENSITIVITY;
+
+            // Vertical mouse movement = pitch (up/down look)
+            fpsPitchAngle -= e.movementY * MOUSE_SENSITIVITY;
+            fpsPitchAngle = Math.max(FPS_PITCH_MIN, Math.min(FPS_PITCH_MAX, fpsPitchAngle));
         });
 
         // Gamepad support for Xbox controller

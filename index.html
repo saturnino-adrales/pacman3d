@@ -200,42 +200,52 @@
         let audioCtx = null;
         let audioUnlocked = false;
 
-        // Initialize audio context (must be triggered by user interaction)
+        // Initialize and unlock audio - MUST be called synchronously from user gesture on iOS
+        function initAndUnlockAudio() {
+            // Create AudioContext synchronously within user gesture
+            if (!audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log('AudioContext created, state:', audioCtx.state);
+                } catch (e) {
+                    console.error('Failed to create AudioContext:', e);
+                    return false;
+                }
+            }
+
+            // Resume must happen synchronously in the gesture handler
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    console.log('AudioContext resumed successfully');
+                }).catch(err => {
+                    console.warn('AudioContext resume failed:', err);
+                });
+            }
+
+            // Play silent oscillator to fully unlock iOS audio (synchronously)
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.001; // Nearly silent
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start(0);
+                oscillator.stop(audioCtx.currentTime + 0.1);
+                audioUnlocked = true;
+                console.log('Audio unlocked with silent oscillator');
+            } catch (e) {
+                console.warn('Silent oscillator failed:', e);
+            }
+
+            return true;
+        }
+
+        // Legacy function for compatibility
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
             return audioCtx;
-        }
-
-        // Unlock audio for iOS/Safari - must be called from user gesture
-        function unlockAudio() {
-            if (audioUnlocked) return Promise.resolve();
-
-            initAudio();
-
-            // iOS Safari requires resume() to be called from a user gesture
-            if (audioCtx.state === 'suspended') {
-                return audioCtx.resume().then(() => {
-                    audioUnlocked = true;
-                    console.log('Audio unlocked successfully');
-
-                    // Play a silent buffer to fully unlock on iOS
-                    const silentBuffer = audioCtx.createBuffer(1, 1, 22050);
-                    const source = audioCtx.createBufferSource();
-                    source.buffer = silentBuffer;
-                    source.connect(audioCtx.destination);
-                    source.start(0);
-
-                    return true;
-                }).catch(err => {
-                    console.warn('Audio unlock failed:', err);
-                    return false;
-                });
-            }
-
-            audioUnlocked = true;
-            return Promise.resolve(true);
         }
 
         // Play a note with oscillator (MIDI-style chiptune)
@@ -2262,28 +2272,38 @@
 
             // Setup start screen listeners
             const startScreen = document.getElementById('startScreen');
-            const startGame = async () => {
+            const startGame = (e) => {
                 if (gameStarted) return;
+
+                // Prevent double-firing on touch devices
+                if (e) {
+                    e.preventDefault();
+                }
+
                 gameStarted = true;
                 startScreen.style.display = 'none';
 
-                // Unlock audio first (required for iOS/Safari PWA)
-                await unlockAudio();
+                // CRITICAL: Unlock audio SYNCHRONOUSLY within the user gesture
+                // iOS requires this to happen immediately, not after await/Promise
+                initAndUnlockAudio();
 
-                // Play intro music
-                playPacmanIntro();
+                // Small delay to let audio context fully initialize, then play intro
+                setTimeout(() => {
+                    playPacmanIntro();
+                }, 100);
 
                 // Start game after intro music finishes (~4.5 seconds)
                 setTimeout(() => {
                     gameRunning = true;
-                }, 4500);
+                }, 4600);
             };
 
+            // Use touchstart for iOS - it's more reliable than touchend for audio unlock
+            startScreen.addEventListener('touchstart', startGame, { passive: false });
             startScreen.addEventListener('click', startGame);
-            startScreen.addEventListener('touchend', startGame); // Better touch support for mobile
             document.addEventListener('keydown', (e) => {
                 if (!gameStarted) {
-                    startGame();
+                    startGame(e);
                 }
             }, { once: false });
         }

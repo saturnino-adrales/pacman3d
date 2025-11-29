@@ -1,0 +1,24 @@
+{
+  "name": "Pac-Man 3D",
+  "short_name": "PacMan3D",
+  "description": "A 3D Pac-Man game with multiple camera modes",
+  "start_url": "/pacman3d/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#ffff00",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

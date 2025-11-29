@@ -147,6 +147,7 @@
     </div>
     <div id="gameWin">
         YOU WIN!
+        <div style="font-size: 24px; margin-top: 10px;">All 10 Stages Complete!</div>
         <br>
         <button id="restartBtn" onclick="restartGame()">Play Again</button>
     </div>
@@ -167,8 +168,29 @@
         // Game constants
         const CELL_SIZE = 2;
         const PACMAN_SPEED = 0.08;
-        const GHOST_SPEED = 0.04;
+        const BASE_GHOST_SPEED = 0.035;
         const POWER_DURATION = 8000;
+        const MAX_STAGE = 10;
+
+        // Stage system
+        let currentStage = 1;
+        const stageColors = [
+            0x4a3728, // Stage 1: Brown (cave)
+            0x1a4a1a, // Stage 2: Dark green
+            0x1a1a4a, // Stage 3: Dark blue
+            0x4a1a4a, // Stage 4: Purple
+            0x4a4a1a, // Stage 5: Olive
+            0x1a4a4a, // Stage 6: Teal
+            0x4a1a1a, // Stage 7: Dark red
+            0x2a2a4a, // Stage 8: Slate blue
+            0x3a2a1a, // Stage 9: Dark bronze
+            0x1a1a1a  // Stage 10: Near black (hardest)
+        ];
+
+        function getGhostSpeed() {
+            // Increase speed by 10% each stage
+            return BASE_GHOST_SPEED * (1 + (currentStage - 1) * 0.1);
+        }
 
         // Audio context for music
         let audioCtx = null;
@@ -684,7 +706,8 @@
         // Materials
         const rockTexture = createRockTexture();
         const rockBumpMap = createRockBumpMap();
-        const wallMaterial = new THREE.MeshPhongMaterial({
+        let wallMaterial = new THREE.MeshPhongMaterial({
+            color: stageColors[0],
             map: rockTexture,
             bumpMap: rockBumpMap,
             bumpScale: 0.3,
@@ -1315,8 +1338,9 @@
                     }
                 }
 
-                // Move ghost
-                const speed = ghost.userData.scared ? GHOST_SPEED * 0.5 : GHOST_SPEED;
+                // Move ghost (speed increases each stage)
+                const ghostSpeed = getGhostSpeed();
+                const speed = ghost.userData.scared ? ghostSpeed * 0.5 : ghostSpeed;
                 ghost.userData.gridX += ghost.userData.dir.x * speed;
                 ghost.userData.gridZ += ghost.userData.dir.z * speed;
 
@@ -1400,10 +1424,79 @@
             document.getElementById('gameOver').style.display = 'block';
         }
 
-        // Win game
+        // Advance to next stage
+        function nextStage() {
+            if (currentStage >= MAX_STAGE) {
+                // Beat all stages - you win!
+                gameRunning = false;
+                document.getElementById('gameWin').style.display = 'block';
+                return;
+            }
+
+            currentStage++;
+
+            // Change wall color for new stage
+            const newColor = stageColors[currentStage - 1];
+            wallMaterial.color.setHex(newColor);
+
+            // Reset dots
+            dots.forEach(dot => scene.remove(dot));
+            dots.length = 0;
+            collectedDots = 0;
+            totalDots = 0;
+            createDots();
+
+            // Reset ghost positions
+            const ghostColors = [0xff0000, 0x00ffff, 0xff69b4, 0xffa500];
+            ghosts.forEach((ghost, index) => {
+                ghost.userData.gridX = 9 + (index % 2);
+                ghost.userData.gridZ = 9 + Math.floor(index / 2);
+                ghost.position.set(
+                    ghost.userData.gridX * CELL_SIZE + CELL_SIZE / 2,
+                    0.8,
+                    ghost.userData.gridZ * CELL_SIZE + CELL_SIZE / 2
+                );
+                ghost.userData.scared = false;
+                ghost.children[0].material.color.setHex(ghostColors[index]);
+                ghost.children[0].material.emissive.setHex(ghostColors[index] * 0.3);
+            });
+
+            // Reset Pac-Man position
+            pacmanPos = { x: 1, z: 1 };
+            pacmanDir = { x: 1, z: 0 };
+            nextDir = { x: 1, z: 0 };
+
+            // Play stage clear sound
+            playStageComplete();
+
+            updateUI();
+        }
+
+        // Play stage complete sound
+        function playStageComplete() {
+            if (!audioCtx) return;
+            const ctx = audioCtx;
+            const now = ctx.currentTime;
+
+            // Victory fanfare
+            const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(freq, now + i * 0.15);
+                gain.gain.setValueAtTime(0.1, now + i * 0.15);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.3);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now + i * 0.15);
+                osc.stop(now + i * 0.15 + 0.3);
+            });
+        }
+
+        // Win game (called when all dots collected)
         function winGame() {
-            gameRunning = false;
-            document.getElementById('gameWin').style.display = 'block';
+            nextStage();
         }
 
         // Restart game
@@ -1417,6 +1510,16 @@
             let hearts = '';
             for (let i = 0; i < lives; i++) hearts += '❤️';
             document.getElementById('lives').textContent = `Lives: ${hearts}`;
+            // Show stage
+            let stageDisplay = document.getElementById('stageDisplay');
+            if (!stageDisplay) {
+                stageDisplay = document.createElement('div');
+                stageDisplay.id = 'stageDisplay';
+                stageDisplay.style.color = '#00ffff';
+                stageDisplay.style.marginTop = '10px';
+                document.getElementById('ui').appendChild(stageDisplay);
+            }
+            stageDisplay.textContent = `Stage: ${currentStage}/${MAX_STAGE}`;
         }
 
         // Keyboard input

@@ -1070,6 +1070,30 @@
         }
 
         // Update Pacman
+        // Check if any movement key or gamepad stick is active
+        function isMovementActive() {
+            // Check keyboard
+            if (keys['w'] || keys['a'] || keys['s'] || keys['d'] ||
+                keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright']) {
+                return true;
+            }
+            // Check gamepad
+            if (gamepadIndex !== null) {
+                const gamepads = navigator.getGamepads();
+                const gamepad = gamepads[gamepadIndex];
+                if (gamepad) {
+                    const leftStickX = gamepad.axes[0];
+                    const leftStickY = gamepad.axes[1];
+                    const dpad = gamepad.buttons[12]?.pressed || gamepad.buttons[13]?.pressed ||
+                                 gamepad.buttons[14]?.pressed || gamepad.buttons[15]?.pressed;
+                    if (dpad || Math.abs(leftStickX) > 0.3 || Math.abs(leftStickY) > 0.3) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         function updatePacman() {
             if (!gameRunning) return;
 
@@ -1081,17 +1105,23 @@
                 pacmanDir = { ...nextDir };
             }
 
-            // Move Pacman (half speed in FPS mode for playability)
-            const moveSpeed = cameraMode === 3 ? PACMAN_SPEED * 0.5 : PACMAN_SPEED;
-            const newX = pacmanPos.x + pacmanDir.x * moveSpeed;
-            const newZ = pacmanPos.z + pacmanDir.z * moveSpeed;
+            // In 3rd person mode (2), only move while key/stick is held
+            // In classic (1) and FPS (3), use traditional auto-move
+            const shouldMove = cameraMode !== 2 || isMovementActive();
 
-            const checkX = Math.round(newX + pacmanDir.x * 0.4);
-            const checkZ = Math.round(newZ + pacmanDir.z * 0.4);
+            if (shouldMove) {
+                // Move Pacman (half speed in FPS mode for playability)
+                const moveSpeed = cameraMode === 3 ? PACMAN_SPEED * 0.5 : PACMAN_SPEED;
+                const newX = pacmanPos.x + pacmanDir.x * moveSpeed;
+                const newZ = pacmanPos.z + pacmanDir.z * moveSpeed;
 
-            if (isValidPosition(checkX, checkZ)) {
-                pacmanPos.x = newX;
-                pacmanPos.z = newZ;
+                const checkX = Math.round(newX + pacmanDir.x * 0.4);
+                const checkZ = Math.round(newZ + pacmanDir.z * 0.4);
+
+                if (isValidPosition(checkX, checkZ)) {
+                    pacmanPos.x = newX;
+                    pacmanPos.z = newZ;
+                }
             }
 
             // Wrap around

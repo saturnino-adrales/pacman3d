@@ -1522,15 +1522,15 @@
 
             // Keyboard camera controls (Q/E for horizontal, R/F for vertical)
             if (cameraMode === 2) {
-                // Third-person mode - orbit camera
+                // Third-person mode - orbit camera (inverted for natural feel)
                 if (e.key.toLowerCase() === 'q') {
-                    cameraOrbitAngle -= CAMERA_ROTATE_SPEED * 3;
-                } else if (e.key.toLowerCase() === 'e') {
                     cameraOrbitAngle += CAMERA_ROTATE_SPEED * 3;
+                } else if (e.key.toLowerCase() === 'e') {
+                    cameraOrbitAngle -= CAMERA_ROTATE_SPEED * 3;
                 } else if (e.key.toLowerCase() === 'r') {
-                    cameraPitchAngle = Math.min(CAMERA_PITCH_MAX, cameraPitchAngle + CAMERA_PITCH_SPEED * 3);
-                } else if (e.key.toLowerCase() === 'f') {
                     cameraPitchAngle = Math.max(CAMERA_PITCH_MIN, cameraPitchAngle - CAMERA_PITCH_SPEED * 3);
+                } else if (e.key.toLowerCase() === 'f') {
+                    cameraPitchAngle = Math.min(CAMERA_PITCH_MAX, cameraPitchAngle + CAMERA_PITCH_SPEED * 3);
                 }
             } else if (cameraMode === 3) {
                 // FPS mode - free look
@@ -1692,12 +1692,12 @@
             const rightStickY = gamepad.axes[3] || 0;
 
             if (cameraMode === 2) {
-                // 3rd person mode - orbit camera around Pac-Man
+                // 3rd person mode - orbit camera (inverted for natural feel)
                 if (Math.abs(rightStickX) > STICK_DEADZONE) {
-                    cameraOrbitAngle += rightStickX * CAMERA_ROTATE_SPEED;
+                    cameraOrbitAngle -= rightStickX * CAMERA_ROTATE_SPEED;
                 }
                 if (Math.abs(rightStickY) > STICK_DEADZONE) {
-                    cameraPitchAngle -= rightStickY * CAMERA_PITCH_SPEED;
+                    cameraPitchAngle += rightStickY * CAMERA_PITCH_SPEED;
                     cameraPitchAngle = Math.max(CAMERA_PITCH_MIN, Math.min(CAMERA_PITCH_MAX, cameraPitchAngle));
                 }
             } else if (cameraMode === 3) {

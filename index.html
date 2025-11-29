@@ -1488,7 +1488,7 @@
             // Update instructions to show gamepad connected
             const instructions = document.getElementById('instructions');
             if (instructions) {
-                instructions.innerHTML = '🎮 Controller connected! Left Stick: move | Right Stick: rotate camera | A: jump | LB/RB: change mode';
+                instructions.innerHTML = '🎮 Controller connected! Left Stick: move | Right Stick: rotate camera | A: jump | LB+RB: cycle camera mode';
             }
         });
 
@@ -1610,21 +1610,16 @@
             }
             prevGamepadButtons.a = aButton;
 
-            // LB (index 4) - previous camera mode
+            // LB + RB (buttons 4 and 5) together - cycle camera mode
             const lbButton = gamepad.buttons[4]?.pressed;
-            if (lbButton && !prevGamepadButtons.lb) {
-                const newMode = cameraMode === 1 ? 3 : cameraMode - 1;
-                setCameraMode(newMode);
-            }
-            prevGamepadButtons.lb = lbButton;
-
-            // RB (index 5) - next camera mode
             const rbButton = gamepad.buttons[5]?.pressed;
-            if (rbButton && !prevGamepadButtons.rb) {
+            const bothBumpersPressed = lbButton && rbButton;
+
+            if (bothBumpersPressed && !prevGamepadButtons.bumpers) {
                 const newMode = cameraMode === 3 ? 1 : cameraMode + 1;
                 setCameraMode(newMode);
             }
-            prevGamepadButtons.rb = rbButton;
+            prevGamepadButtons.bumpers = bothBumpersPressed;
         }
 
         // Initialize game

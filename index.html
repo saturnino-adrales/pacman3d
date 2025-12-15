@@ -129,6 +129,83 @@
                 display: none !important;
             }
         }
+
+        /* Touch Controls */
+        #touchControls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 150;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #touchControls.active {
+            display: block;
+        }
+        .touch-dpad {
+            position: relative;
+            width: 140px;
+            height: 140px;
+        }
+        .touch-btn {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.6);
+            transition: background 0.1s, transform 0.1s;
+            cursor: pointer;
+        }
+        .touch-btn:active, .touch-btn.pressed {
+            background: rgba(255, 255, 0, 0.4);
+            border-color: rgba(255, 255, 0, 0.6);
+            transform: scale(0.95);
+        }
+        .touch-btn.up { top: 0; left: 50%; transform: translateX(-50%); }
+        .touch-btn.up:active, .touch-btn.up.pressed { transform: translateX(-50%) scale(0.95); }
+        .touch-btn.down { bottom: 0; left: 50%; transform: translateX(-50%); }
+        .touch-btn.down:active, .touch-btn.down.pressed { transform: translateX(-50%) scale(0.95); }
+        .touch-btn.left { left: 0; top: 50%; transform: translateY(-50%); }
+        .touch-btn.left:active, .touch-btn.left.pressed { transform: translateY(-50%) scale(0.95); }
+        .touch-btn.right { right: 0; top: 50%; transform: translateY(-50%); }
+        .touch-btn.right:active, .touch-btn.right.pressed { transform: translateY(-50%) scale(0.95); }
+
+        /* Touch toggle button */
+        #touchToggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 150;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: background 0.2s;
+        }
+        #touchToggle:hover, #touchToggle:active {
+            background: rgba(255, 255, 0, 0.3);
+            border-color: rgba(255, 255, 0, 0.5);
+        }
+        #touchToggle.active {
+            background: rgba(255, 255, 0, 0.4);
+            border-color: rgba(255, 255, 0, 0.6);
+        }
     </style>
 </head>
 <body>
@@ -166,6 +243,19 @@
         <div style="font-size: 32px; font-weight: bold;">Rotate to Landscape</div>
         <div style="font-size: 16px; margin-top: 15px; color: #aaa;">Then tap to start - screen will lock in landscape</div>
     </div>
+
+    <!-- Touch Controls (D-pad) -->
+    <div id="touchControls">
+        <div class="touch-dpad">
+            <div class="touch-btn up" data-dir="up">▲</div>
+            <div class="touch-btn down" data-dir="down">▼</div>
+            <div class="touch-btn left" data-dir="left">◀</div>
+            <div class="touch-btn right" data-dir="right">▶</div>
+        </div>
+    </div>
+
+    <!-- Touch Toggle Button -->
+    <div id="touchToggle" title="Toggle touch controls">🎮</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
@@ -2170,6 +2260,84 @@
             if (instructions) {
                 instructions.innerHTML = 'WASD: move | Q/E: look left/right | R/F: look up/down | SPACE: jump | 1/2/3: camera mode';
             }
+        });
+
+        // Touch Controls
+        let touchControlsEnabled = false;
+        const touchControls = document.getElementById('touchControls');
+        const touchToggle = document.getElementById('touchToggle');
+        const touchButtons = document.querySelectorAll('.touch-btn');
+
+        // Toggle touch controls
+        touchToggle.addEventListener('click', () => {
+            touchControlsEnabled = !touchControlsEnabled;
+            touchControls.classList.toggle('active', touchControlsEnabled);
+            touchToggle.classList.toggle('active', touchControlsEnabled);
+        });
+
+        // Handle touch direction input
+        function handleTouchDirection(direction) {
+            if (!gameRunning) return;
+
+            // Get directions based on camera mode
+            let dirs;
+            if (cameraMode === 1) {
+                dirs = {
+                    forward: { x: 0, z: -1 },
+                    backward: { x: 0, z: 1 },
+                    left: { x: -1, z: 0 },
+                    right: { x: 1, z: 0 }
+                };
+            } else if (cameraMode === 2) {
+                dirs = getCameraRelativeDirections();
+            } else {
+                dirs = getFPSLookRelativeDirections();
+            }
+
+            switch (direction) {
+                case 'up': nextDir = dirs.forward; break;
+                case 'down': nextDir = dirs.backward; break;
+                case 'left': nextDir = dirs.left; break;
+                case 'right': nextDir = dirs.right; break;
+            }
+        }
+
+        // Touch event handlers
+        touchButtons.forEach(btn => {
+            const dir = btn.dataset.dir;
+
+            // Touch start
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                btn.classList.add('pressed');
+                handleTouchDirection(dir);
+            }, { passive: false });
+
+            // Touch end
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                btn.classList.remove('pressed');
+            }, { passive: false });
+
+            // Touch cancel
+            btn.addEventListener('touchcancel', (e) => {
+                btn.classList.remove('pressed');
+            });
+
+            // Mouse events for desktop testing
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                btn.classList.add('pressed');
+                handleTouchDirection(dir);
+            });
+
+            btn.addEventListener('mouseup', (e) => {
+                btn.classList.remove('pressed');
+            });
+
+            btn.addEventListener('mouseleave', (e) => {
+                btn.classList.remove('pressed');
+            });
         });
 
         // Poll gamepad input (called in animate loop)
